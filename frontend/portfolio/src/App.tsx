@@ -24,7 +24,7 @@ function App() {
 
   useEffect(() => {
     if (connection.status === 'connected' && address) {
-      const fetchBalances = async () => {
+      const fetchBalances = async (): Promise<void> => {
         try {
           const response = await axios.get('http://localhost:8000/portfolio', {
             params: { address, chainId: connection.chainId,},

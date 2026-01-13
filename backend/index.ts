@@ -31,11 +31,26 @@ const ERC20_ABI = [
 
 /* ---------------- Routes ---------------- */
 
-app.get('/', (_: Request, res: Response) => {
+type Token = {
+    address: string
+    symbol: string | null
+    decimals: number | null
+    logo: string | null
+    balance: string
+}
+type PortfolioResponse = {
+    tokens: Token[]
+}
+type ErrorResponse = { error: string }
+type PortfolioApiResponse = PortfolioResponse | ErrorResponse
+
+
+
+app.get('/', (_: Request, res: Response): void => {
   res.send('Backend running')
 })
 
-app.get('/portfolio', async (req: Request, res: Response) => {
+app.get('/portfolio', async (req: Request, res: Response<PortfolioApiResponse>): Promise<Response<PortfolioApiResponse>> => {
   try {
     const { address, chainId } = req.query
 
@@ -58,14 +73,25 @@ app.get('/portfolio', async (req: Request, res: Response) => {
     const network = alchemyChains[Number(chainId)]
 
     /* ---------- ALCHEMY SUPPORTED CHAINS ---------- */
+
+
+    type tokenBalance = {
+        contractAddress: string
+        tokenBalance: string | null
+    }
+
+    type alchemyResponse = {
+        tokenBalances: tokenBalance[]
+    }
+
     if (network) {
         const alchemy = new Alchemy({ apiKey: process.env.ALCHEMY_KEY!, network: network });
         const balances = await alchemy.core.getTokenBalances(address as string)
 
-        const detailed = await Promise.all(
+        const detailed: Token[] = await Promise.all(
         balances.tokenBalances
-          .filter(t => t.tokenBalance && BigInt(t.tokenBalance) > 0n)
-          .map(async t => {
+          .filter((t: tokenBalance) => t.tokenBalance && BigInt(t.tokenBalance) > 0n)
+          .map(async (t: tokenBalance): Promise<Token> => {
             const meta = await alchemy.core.getTokenMetadata(t.contractAddress)
 
             return {
@@ -96,22 +122,22 @@ app.get('/portfolio', async (req: Request, res: Response) => {
         usdt.symbol(),
       ])
 
-      const balance = formatUnits(rawBalance, decimals)
+    const balance = formatUnits(rawBalance, decimals)
 
-      const hasBalance = rawBalance > 0n
+    const hasBalance = rawBalance > 0n
 
-const tokens = hasBalance
-  ? [
-      {
-        address: USDT_BSC,
-        symbol,
-        decimals: Number(decimals), // ensure number
-        logo:
-          'https://assets.coingecko.com/coins/images/325/large/Tether.png',
-        balance: balance.toString(), // string
-      },
-    ]
-  : []
+    const tokens = hasBalance
+    ? [
+        {
+            address: USDT_BSC,
+            symbol,
+            decimals: Number(decimals), // ensure number
+            logo:
+            'https://assets.coingecko.com/coins/images/325/large/Tether.png',
+            balance: balance.toString(), // string
+        },
+        ]
+    : []
 
 
       return res.json({ tokens })
@@ -120,7 +146,7 @@ const tokens = hasBalance
     return res.json({ tokens: [] })
   } catch (err) {
     console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 

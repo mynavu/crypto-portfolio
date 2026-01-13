@@ -1,7 +1,11 @@
-const express = require('express');
-const cors = require('cors');
+import cors from 'cors'
+import express from 'express'
+
+import { Request, Response } from 'express'
+
 
 import 'dotenv/config'
+
 
 import { Alchemy, Network } from 'alchemy-sdk'
 import { JsonRpcProvider, Contract, formatUnits } from 'ethers'
@@ -27,11 +31,11 @@ const ERC20_ABI = [
 
 /* ---------------- Routes ---------------- */
 
-app.get('/', (_: any, res: any) => {
+app.get('/', (_: Request, res: Response) => {
   res.send('Backend running')
 })
 
-app.get('/portfolio', async (req: any, res: any) => {
+app.get('/portfolio', async (req: Request, res: Response) => {
   try {
     const { address, chainId } = req.query
 

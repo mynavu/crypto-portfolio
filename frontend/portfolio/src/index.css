@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  background-color: #181818;
+  background-color: #1c1c23;
   color: rgba(255, 255, 255, 0.87);
   color-scheme: light dark;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -24,4 +24,8 @@
 
 body {
   font-family: "JetBrains Mono", monospace;
+}
+
+.front * {
+  z-index: 10;
 }

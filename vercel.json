@@ -1,5 +1,8 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }
-  ]
+  ],
+  "buildCommand": "cd frontend/portfolio && npm install && npm run build",
+  "outputDirectory": "frontend/portfolio/dist",
+  "installCommand": "npm install && cd frontend/portfolio && npm install"
 }

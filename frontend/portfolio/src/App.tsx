@@ -18,28 +18,42 @@ function App() {
     balance: string
   }
 
-
   const [balances, setBalances] = useState<Token[]>([])
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (connection.status === 'connected' && address) {
       const fetchBalances = async (): Promise<void> => {
+        setLoading(true)
         try {
+          console.log('Fetching balances for:', address, 'on chain:', connection.chainId)
+          
           const response = await axios.get('/api/portfolio', {
-            params: { address, chainId: connection.chainId,},
+            params: { address, chainId: connection.chainId },
           })
-          setBalances(response.data.tokens)
-          console.log(response.data.tokens[0].logo)
-          console.log('Fetched balances:', response.data.tokens)
+          
+          console.log('API Response:', response.data)
+          
+          if (response.data.tokens && Array.isArray(response.data.tokens)) {
+            setBalances(response.data.tokens)
+            console.log('Fetched balances:', response.data.tokens)
+            if (response.data.tokens.length > 0) {
+              console.log('First token logo:', response.data.tokens[0].logo)
+            }
+          } else {
+            console.log('No tokens returned or invalid response')
+            setBalances([])
+          }
         } catch (error) {
           console.error('Error fetching token balances:', error)
+          setBalances([])
+        } finally {
+          setLoading(false)
         }
       }
-
       fetchBalances();
-
     }
-  }, [connection.status, address])
+  }, [connection.status, address, connection.chainId])
       
   return (
     <>
@@ -55,36 +69,23 @@ function App() {
             mouseInteractive={false}
           />
         </div>
-<div
-  className={`
-    relative
-    z-10
-    mx-auto
-    mt-24
-    max-w-xl
-    rounded-2xl
-    bg-white/10
-    backdrop-blur-xl
-    shadow-2xl
-    p-6
-    border
-    transition-all
-    duration-300
-    ${
-      connection.status === 'connected'
-        ? 'border-white shadow-[0_0_30px_rgba(209,209,209,0.6)]'
-        : 'border-white/20'
-    }
-  `}
->
-
-
-          <h2 className='text-2xl font-bold'>{connection.status === 'connected' ? 'Portfolio' : 'Connection'}</h2>
-
+        <div className="
+          relative
+          z-10
+          mx-auto
+          mt-24
+          max-w-xl
+          rounded-2xl
+          border border-white/20
+          bg-white/10
+          backdrop-blur-xl
+          shadow-2xl
+          p-6
+        ">
+          <h2 className='text-2xl font-bold'>Connection</h2>
           <div>
             status: {connection.status}
           </div>
-
           {connection.status === 'connected' && (
             <>
             addresses: {JSON.stringify(connection.addresses)}
@@ -94,6 +95,13 @@ function App() {
               <button className='m-2 p-2 border rounded-lg bg-white/20 hover:bg-white/30 transition cursor-pointer' type="button" onClick={() => disconnect()}>
                 Disconnect
               </button>
+              
+              {loading && <div>Loading balances...</div>}
+              
+              {!loading && balances.length === 0 && (
+                <div>No token balances found</div>
+              )}
+              
               {balances.length > 0 && (
                 <div>
                   <h2 className='font-bold'>Token Balances</h2>
@@ -117,7 +125,6 @@ function App() {
             </>
           )}
         
-          {connection.status !== 'connected' && (
           <div>
             <h2>Connect</h2>
             {connectors.map((connector) => (
@@ -132,7 +139,6 @@ function App() {
             <div>wallet connection: {status}</div>
             <div>{error?.message}</div>
           </div>
-          )}
         </div>
       </div>
     </>

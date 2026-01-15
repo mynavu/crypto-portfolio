@@ -51,23 +51,27 @@ export default async function handler(
         return
       }
 
-      const alchemyChains: Record<number, Network> = {
-        1: Network.ETH_MAINNET,
-        10: Network.OPT_MAINNET,
-        42161: Network.ARB_MAINNET,
-        8453: Network.BASE_MAINNET,
-        56: Network.BNB_MAINNET,
-        137: Network.MATIC_MAINNET,
-        43114: Network.AVAX_MAINNET,
-        250: Network.FANTOM_MAINNET,
-        324: Network.ZKSYNC_MAINNET,
-        1101: Network.POLYGONZKEVM_MAINNET,
-        59144: Network.LINEA_MAINNET,
-        534352: Network.SCROLL_MAINNET,
-        7777777: Network.ZORA_MAINNET,
-        5000: Network.MANTLE_MAINNET,
-        592: Network.ASTAR_MAINNET,
-      }
+  const alchemyChains: Record<number, Network> = {
+    1: Network.ETH_MAINNET,                 // Ethereum
+    10: Network.OPT_MAINNET,                // Optimism
+    42161: Network.ARB_MAINNET,             // Arbitrum One
+    8453: Network.BASE_MAINNET,             // Base
+    56: Network.BNB_MAINNET,                // BNB Chain
+    137: Network.MATIC_MAINNET,             // Polygon
+    43114: Network.AVAX_MAINNET,             // Avalanche
+    250: Network.FANTOM_MAINNET,             // Fantom
+    324: Network.ZKSYNC_MAINNET,             // zkSync Era
+    1101: Network.POLYGONZKEVM_MAINNET,     // Polygon zkEVM
+    59144: Network.LINEA_MAINNET,            // Linea
+    534352: Network.SCROLL_MAINNET,          // Scroll
+    7777777: Network.ZORA_MAINNET,           // Zora
+    5000: Network.MANTLE_MAINNET,            // Mantle
+    592: Network.ASTAR_MAINNET,              // Astar
+    42220: Network.CELO_MAINNET,             // Celo
+    100: Network.GNOSIS_MAINNET,             // Gnosis Chain (xDai)
+    81457: Network.BLAST_MAINNET,            // Blast
+  }
+
 
       const network = alchemyChains[Number(chainId)]
 

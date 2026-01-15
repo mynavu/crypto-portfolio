@@ -1,0 +1,9 @@
+{
+  "name": "crypto-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:frontend": "cd frontend/portfolio && npm install",
+    "build:frontend": "cd frontend/portfolio && npm run build"
+  }
+}

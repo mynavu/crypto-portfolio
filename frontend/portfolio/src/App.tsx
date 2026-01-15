@@ -29,7 +29,6 @@ function App() {
             params: { address, chainId: connection.chainId,},
           })
           setBalances(response.data.tokens)
-          console.log(response.data.tokens[0].logo)
           console.log('Fetched balances:', response.data.tokens)
         } catch (error) {
           console.error('Error fetching token balances:', error)

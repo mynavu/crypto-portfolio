@@ -19,26 +19,36 @@ function App() {
   }
 
 
-  const [balances, setBalances] = useState<Token[]>([])
+const [balances, setBalances] = useState<Token[]>([])
+const [loading, setLoading] = useState(false)
+const [fetchError, setFetchError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (connection.status === 'connected' && address) {
-      const fetchBalances = async (): Promise<void> => {
-        try {
-          const response = await axios.get('/api/portfolio', {
-            params: { address, chainId: connection.chainId,},
-          })
-          setBalances(response.data.tokens)
-          console.log('Fetched balances:', response.data.tokens)
-        } catch (error) {
-          console.error('Error fetching token balances:', error)
-        }
+useEffect(() => {
+  if (connection.status === 'connected' && address) {
+    const fetchBalances = async (): Promise<void> => {
+      setLoading(true)
+      setFetchError(null)
+      try {
+        console.log('Fetching for address:', address, 'chainId:', connection.chainId)
+        
+        const response = await axios.get('/api/portfolio', {
+          params: { address, chainId: connection.chainId },
+        })
+        setBalances(response.data.tokens)
+        console.log('Fetched balances:', response.data.tokens)
+      } catch (error) {
+        console.error('Error fetching token balances:', error)
+        setFetchError('Failed to fetch balances')
+      } finally {
+        setLoading(false)
       }
-
-      fetchBalances();
-
     }
-  }, [connection.status, address])
+
+    fetchBalances();
+  } else {
+    setBalances([])
+  }
+}, [connection.status, address, connection.chainId])
       
   return (
     <>
@@ -86,19 +96,27 @@ function App() {
 
           {connection.status === 'connected' && (
             <>
-            addresses: {JSON.stringify(connection.addresses)}
-            <br />
-            chainId: {connection.chainId}
-            <br />
+              addresses: {JSON.stringify(connection.addresses)}
+              <br />
+              chainId: {connection.chainId}
+              <br />
               <button className='m-2 p-2 border rounded-lg bg-white/20 hover:bg-white/30 transition cursor-pointer' type="button" onClick={() => disconnect()}>
                 Disconnect
               </button>
+    
+              {loading && <div className="text-white/70">Loading balances...</div>}
+              {fetchError && <div className="text-red-400">{fetchError}</div>}
+    
+              {!loading && balances.length === 0 && !fetchError && (
+                <div className="text-white/70">No tokens found on this network</div>
+              )}
+    
               {balances.length > 0 && (
                 <div>
                   <h2 className='font-bold'>Token Balances</h2>
                   <ul>
                     {balances.map((token) => (
-                      <li key={token.address}>
+                      <li key={token.address} className="flex items-center gap-2 my-1">
                         {token.logo && (
                           <img
                             src={token.logo}
@@ -106,8 +124,8 @@ function App() {
                             width={20}
                             height={20}
                           />
-                        )}{' '}
-                        {token.symbol}: {token.balance}
+                        )}
+                        <span>{token.symbol}: {parseFloat(token.balance).toFixed(6)}</span>
                       </li>
                     ))}
                   </ul>

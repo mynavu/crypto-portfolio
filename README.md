@@ -15,7 +15,7 @@ Track and manage crypto assets using React, Wagmi, and Alchemy. This project is 
 ## Installation
 Clone the repository and install dependencies:
 ```bash
-git clone https://github.com/yourusername/crypto-portfolio.git
+git clone https://github.com/mynavu/crypto-portfolio.git
 cd crypto-portfolio
 npm install
 npm run dev

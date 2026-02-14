@@ -10,11 +10,17 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@kamino-finance/klend-sdk": "^7.3.18",
+    "@solana/web3.js": "^1.98.4",
     "alchemy-sdk": "^3.6.5",
+    "bn.js": "^5.2.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2",
+    "viem": "^2.45.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

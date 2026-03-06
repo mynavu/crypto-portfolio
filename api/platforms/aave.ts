@@ -1,13 +1,7 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import "dotenv/config";
 import { JsonRpcProvider, Contract, getAddress } from "ethers";
-import {
-  USDC_str,
-  USDT_str,
-  WBTC_str,
-  WSOL_str,
-  WETH_str,
-} from "../address.ts";
+import { USDC_str, USDT_str, WBTC_str, WSOL_str, WETH_str } from "../address";
 
 // ======================
 // ETHEREUM PROVIDER

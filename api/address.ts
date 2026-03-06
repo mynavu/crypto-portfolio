@@ -1,0 +1,5 @@
+export const USDC_str = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+export const USDT_str = "0xdac17f958d2ee523a2206206994597c13d831ec7";
+export const WBTC_str = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
+export const WSOL_str = "0xD31a59c85aE9D8edEFeC411D448f90841571b89c";
+export const WETH_str = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";

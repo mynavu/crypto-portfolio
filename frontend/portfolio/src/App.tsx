@@ -4,6 +4,7 @@ import axios from "axios";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AaveApyFlat = Record<string, number>;
+type CompoundApyFlat = Record<string, number>;
 
 type RateEntry = {
   protocol: string; // e.g. "AAVE"
@@ -26,6 +27,19 @@ const AAVE_NETWORKS: { key: string; label: string }[] = [
   { key: "polygon", label: "Polygon" },
   { key: "avalanche", label: "Avalanche" },
 ];
+
+const COMPOUND_NETWORKS: { key: string; label: string }[] = [
+  { key: "ethereum", label: "Ethereum" },
+  { key: "arbitrum", label: "Arbitrum" },
+  { key: "optimism", label: "Optimism" },
+];
+
+const COMPOUND_TOKEN_MAP: Partial<Record<Asset, string>> = {
+  USDC: "usdc",
+  USDT: "usdt",
+  ETH: "eth",
+  BTC: "btc",
+};
 
 const AAVE_TOKEN_MAP: Partial<Record<Asset, string>> = {
   USDC: "usdc",
@@ -63,12 +77,13 @@ const AAVE_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> = {
   },
 };
 
-const COMPOUND_LINKS: Partial<Record<Asset, string>> = {
-  USDC: "https://app.compound.finance/markets/usdc-mainnet",
-  USDT: "https://app.compound.finance/markets/usdt-mainnet",
-  ETH: "https://app.compound.finance/markets/weth-mainnet",
-  BTC: "https://app.compound.finance/markets/wbtc-mainnet",
-};
+const COMPOUND_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> =
+  {
+    ETH: { ethereum: "https://app.compound.finance/markets/weth-mainnet" },
+    BTC: { ethereum: "https://app.compound.finance/markets/wbtc-mainnet" },
+    USDC: { ethereum: "https://app.compound.finance/markets/usdc-mainnet" },
+    USDT: { ethereum: "https://app.compound.finance/markets/usdt-mainnet" },
+  };
 
 const KAMINO_LINKS: Partial<Record<Asset, string>> = {
   USDC: "https://kamino.com/borrow/reserve/7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF/D6q6wuQSrifJKZYpR1M8R4YawnLDtDsMmWM1NbBmgJ59",
@@ -123,6 +138,29 @@ function buildAaveEntries(data: AaveApyFlat, asset: Asset): RateEntry[] {
   });
 }
 
+function buildCompoundEntries(
+  data: CompoundApyFlat,
+  asset: Asset,
+): RateEntry[] {
+  const tokenKey = COMPOUND_TOKEN_MAP[asset];
+  if (!tokenKey) return [];
+
+  return COMPOUND_NETWORKS.flatMap(({ key, label }) => {
+    const supplyAPY = data[`${key}_${tokenKey}_supplyAPY`];
+    const borrowAPY = data[`${key}_${tokenKey}_borrowAPY`];
+    if (supplyAPY == null && borrowAPY == null) return [];
+    return [
+      {
+        protocol: "COMPOUND",
+        network: label,
+        supplyAPY: typeof supplyAPY === "number" ? supplyAPY : null,
+        borrowAPY: typeof borrowAPY === "number" ? borrowAPY : null,
+        link: COMPOUND_LINKS[asset]?.[key] ?? "",
+      },
+    ];
+  });
+}
+
 // Single-network protocol builder — duplicate + extend for multi-network Compound/Kamino later
 function buildSingleNetworkEntries(
   apyData: Record<string, number> | null,
@@ -152,18 +190,10 @@ function buildSingleNetworkEntries(
 function buildAllEntries(
   asset: Asset,
   aaveFlat: AaveApyFlat | null,
-  compoundAPY: Record<string, number> | null,
+  compoundFlat: CompoundApyFlat | null,
   kaminoAPY: Record<string, number> | null,
   sparkAPY: Record<string, number> | null,
 ): RateEntry[] {
-  const compoundKeyMap: Partial<
-    Record<Asset, { supply: string; borrow: string }>
-  > = {
-    USDC: { supply: "usdcSupplyAPY", borrow: "usdcBorrowAPY" },
-    USDT: { supply: "usdtSupplyAPY", borrow: "usdtBorrowAPY" },
-    ETH: { supply: "ethSupplyAPY", borrow: "ethBorrowAPY" },
-    BTC: { supply: "btcSupplyAPY", borrow: "btcBorrowAPY" },
-  };
   const kaminoKeyMap: Partial<
     Record<Asset, { supply: string; borrow: string }>
   > = {
@@ -183,14 +213,7 @@ function buildAllEntries(
 
   return [
     ...(aaveFlat ? buildAaveEntries(aaveFlat, asset) : []),
-    ...buildSingleNetworkEntries(
-      compoundAPY,
-      "Compound",
-      "Ethereum",
-      asset,
-      COMPOUND_LINKS,
-      compoundKeyMap,
-    ),
+    ...(compoundFlat ? buildCompoundEntries(compoundFlat, asset) : []),
     ...buildSingleNetworkEntries(
       kaminoAPY,
       "Kamino",
@@ -433,7 +456,7 @@ function RateColumn({
   );
 }
 
-function AssetCell({ asset, entries }: { asset: Asset; entries: RateEntry[] }) {
+function AssetCell({ entries }: { entries: RateEntry[] }) {
   return (
     <div
       style={{
@@ -443,7 +466,6 @@ function AssetCell({ asset, entries }: { asset: Asset; entries: RateEntry[] }) {
         minWidth: "320px",
       }}
     >
-      <div>Asset: ${asset}</div>
       <div style={{ flex: 1 }}>
         <RateColumn entries={entries} type="supply" />
       </div>
@@ -684,7 +706,6 @@ function App() {
                   <LoadingAssetCell />
                 ) : (
                   <AssetCell
-                    asset={asset}
                     entries={buildAllEntries(
                       asset,
                       aaveFlat,

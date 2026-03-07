@@ -159,7 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    console.log("AAVE All APYS:", allAPYS);
+    // console.log("AAVE All APYS:", allAPYS);
     res.status(200).json(allAPYS);
   } catch (err) {
     console.error(err);

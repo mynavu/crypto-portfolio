@@ -1,27 +1,47 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import "dotenv/config";
 import { JsonRpcProvider, Contract, getAddress } from "ethers";
-import { USDC_str, USDT_str, WBTC_str, WSOL_str, WETH_str } from "../address";
+
+import { aave } from "../address/aave";
+
+import { USDC_str, USDT_str, WBTC_str, WETH_str } from "../address";
+import { AAVE_POOLS } from "../pools/aave";
+import {
+  arbitrum_net,
+  ethereum_net,
+  optimism_net,
+  avalanche_net,
+  base_net,
+  polygon_net,
+} from "../networks";
 
 // ======================
-// ETHEREUM PROVIDER
+// PROVIDERS + POOLS PER NETWORK
 // ======================
 
-const provider = new JsonRpcProvider(
-  `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
-);
+const providerList: Record<string, [JsonRpcProvider, string, Object]> = {
+  arbitrum: [arbitrum_net, AAVE_POOLS.arbitrum, aave.arbitrum],
+  ethereum: [ethereum_net, AAVE_POOLS.ethereum, aave.ethereum],
+  optimism: [optimism_net, AAVE_POOLS.optimism, aave.optimism],
+  avalanche: [avalanche_net, AAVE_POOLS.avalanche, aave.avalanche],
+  base: [base_net, AAVE_POOLS.base, aave.base],
+  polygon: [polygon_net, AAVE_POOLS.polygon, aave.polygon],
+};
 
 // ======================
-// AAVE
+// TOKENS
 // ======================
 
-const AAVE_POOL = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2";
-const USDC = getAddress(USDC_str);
-const USDT = getAddress(USDT_str);
-const WBTC = getAddress(WBTC_str);
-const WETH = getAddress(WETH_str);
+const addressList = {
+  usdc: getAddress(USDC_str),
+  usdt: getAddress(USDT_str),
+  btc: getAddress(WBTC_str),
+  eth: getAddress(WETH_str),
+};
 
-const addressList = { usdc: USDC, usdt: USDT, btc: WBTC, eth: WETH };
+// ======================
+// AAVE ABI
+// ======================
 
 const AavePoolABI = [
   `function getReserveData(address asset)
@@ -43,14 +63,13 @@ const AavePoolABI = [
    )`,
 ];
 
-const pool = new Contract(AAVE_POOL, AavePoolABI, provider);
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
 
 // ======================
-// API HANDLER
+// HANDLER
 // ======================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -67,34 +86,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const results = await Promise.all(
-      Object.entries(addressList).map(async ([name, address]) => {
-        const reserveData = await pool.getReserveData(address);
-        const liquidityRate = reserveData.currentLiquidityRate;
-        const variableBorrowRate = reserveData.currentVariableBorrowRate;
-        const supplyAPR = Number(liquidityRate) / 1e27;
-        const borrowAPR = Number(variableBorrowRate) / 1e27;
-        const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
-        const supplyAPY =
-          (1 + supplyAPR / SECONDS_PER_YEAR) ** SECONDS_PER_YEAR - 1;
-        const borrowAPY =
-          (1 + borrowAPR / SECONDS_PER_YEAR) ** SECONDS_PER_YEAR - 1;
-        return { name, supplyAPY, borrowAPY };
-      }),
+    // Use allSettled so one broken network (e.g. Alchemy 403) doesn't crash everything
+    const networkResults = await Promise.allSettled(
+      Object.entries(providerList).map(
+        async ([networkName, [provider, poolAddress, tokenAddress]]) => {
+          const pool = new Contract(poolAddress, AavePoolABI, provider);
+
+          const tokenResults = await Promise.allSettled(
+            Object.entries(tokenAddress).map(async ([name, address]) => {
+              const reserveData = await pool.getReserveData(address);
+
+              const supplyAPR = Number(reserveData.currentLiquidityRate) / 1e27;
+              const borrowAPR =
+                Number(reserveData.currentVariableBorrowRate) / 1e27;
+
+              const supplyAPY =
+                (1 + supplyAPR / SECONDS_PER_YEAR) ** SECONDS_PER_YEAR - 1;
+              const borrowAPY =
+                (1 + borrowAPR / SECONDS_PER_YEAR) ** SECONDS_PER_YEAR - 1;
+
+              return {
+                network: networkName,
+                token: name,
+                supplyAPY,
+                borrowAPY,
+              };
+            }),
+          );
+
+          // Filter to only successful token fetches
+          return tokenResults
+            .filter(
+              (
+                r,
+              ): r is PromiseFulfilledResult<{
+                network: string;
+                token: string;
+                supplyAPY: number;
+                borrowAPY: number;
+              }> => r.status === "fulfilled",
+            )
+            .map((r) => r.value);
+        },
+      ),
     );
 
-    const allAPYS = Object.fromEntries(
-      results.flatMap(({ name, supplyAPY, borrowAPY }) => [
-        [name + "SupplyAPY", supplyAPY],
-        [name + "BorrowAPY", borrowAPY],
-      ]),
-    );
+    const allAPYS: Record<string, number> = {};
 
-    if (!allAPYS) {
-      res.status(400).json({ error: "AAVE supply and borrow APY not found" });
+    for (const networkResult of networkResults) {
+      if (networkResult.status === "rejected") {
+        // Log which network failed but continue building the response
+        console.warn(
+          "Network fetch failed (skipping):",
+          networkResult.reason?.message ?? networkResult.reason,
+        );
+        continue;
+      }
+
+      for (const {
+        network,
+        token,
+        supplyAPY,
+        borrowAPY,
+      } of networkResult.value) {
+        allAPYS[`${network}_${token}_supplyAPY`] = supplyAPY;
+        allAPYS[`${network}_${token}_borrowAPY`] = borrowAPY;
+      }
+    }
+
+    if (!Object.keys(allAPYS).length) {
+      res.status(500).json({ error: "All networks failed to respond" });
       return;
     }
 
+    console.log("AAVE All APYS:", allAPYS);
     res.status(200).json(allAPYS);
   } catch (err) {
     console.error(err);

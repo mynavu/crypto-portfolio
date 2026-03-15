@@ -3,7 +3,15 @@ import "dotenv/config";
 import { JsonRpcProvider, Contract } from "ethers";
 
 import { compound } from "../address/compound";
-import { arbitrum_net, ethereum_net, optimism_net } from "../networks";
+import {
+  arbitrum_net,
+  ethereum_net,
+  optimism_net,
+  base_net,
+  linea_net,
+  polygon_net,
+  scroll_net,
+} from "../networks";
 
 // ======================
 // COMPOUND (COMET) ABI
@@ -28,6 +36,10 @@ const providerList: Record<string, [JsonRpcProvider, CompoundAddresses]> = {
   arbitrum: [arbitrum_net, compound.arbitrum],
   ethereum: [ethereum_net, compound.ethereum],
   optimism: [optimism_net, compound.optimism],
+  base: [base_net, compound.base],
+  linea: [linea_net, compound.linea],
+  polygon: [polygon_net, compound.polygon],
+  scroll: [scroll_net, compound.scroll],
 };
 
 const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
@@ -56,43 +68,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const networkResults = await Promise.allSettled(
       Object.entries(providerList).map(
         async ([networkName, [provider, tokenAddresses]]) => {
-          // Only build contracts for tokens that exist on this network
+          console.log(`\n--- Testing network: ${networkName} ---`);
+
           const availableComets: Array<{ token: string; comet: Contract }> =
             Object.entries(tokenAddresses)
               .filter(([, address]) => !!address)
-              .map(([token, address]) => ({
-                token,
-                comet: new Contract(address as string, CometABI, provider),
-              }));
+              .map(([token, address]) => {
+                console.log(
+                  `Creating contract for ${networkName} ${token}: ${address}`,
+                );
+                return {
+                  token,
+                  comet: new Contract(address as string, CometABI, provider),
+                };
+              });
 
           const tokenResults = await Promise.allSettled(
             availableComets.map(async ({ token, comet }) => {
-              const [totalSupply, totalBorrow] = await Promise.all([
-                comet.totalSupply(),
-                comet.totalBorrow(),
-              ]);
+              try {
+                console.log(
+                  `Calling totalSupply/totalBorrow for ${networkName} ${token}`,
+                );
 
-              const utilization =
-                totalSupply === 0n
-                  ? 0n
-                  : (totalBorrow * 10n ** 18n) / totalSupply;
-
-              const [supplyRatePerSecond, borrowRatePerSecond] =
-                await Promise.all([
-                  comet.getSupplyRate(utilization),
-                  comet.getBorrowRate(utilization),
+                const [totalSupply, totalBorrow] = await Promise.all([
+                  comet.totalSupply(),
+                  comet.totalBorrow(),
                 ]);
 
-              const supplyAPY =
-                (1 + Number(supplyRatePerSecond) / 1e18) ** SECONDS_PER_YEAR -
-                1;
-              const borrowAPY =
-                (1 + Number(borrowRatePerSecond) / 1e18) ** SECONDS_PER_YEAR -
-                1;
+                console.log(
+                  `${networkName} ${token} totals`,
+                  totalSupply.toString(),
+                  totalBorrow.toString(),
+                );
 
-              return { network: networkName, token, supplyAPY, borrowAPY };
+                const utilization =
+                  totalSupply === 0n
+                    ? 0n
+                    : (totalBorrow * 10n ** 18n) / totalSupply;
+
+                console.log(
+                  `${networkName} ${token} utilization`,
+                  utilization.toString(),
+                );
+
+                const [supplyRatePerSecond, borrowRatePerSecond] =
+                  await Promise.all([
+                    comet.getSupplyRate(utilization),
+                    comet.getBorrowRate(utilization),
+                  ]);
+
+                console.log(
+                  `${networkName} ${token} rates`,
+                  supplyRatePerSecond.toString(),
+                  borrowRatePerSecond.toString(),
+                );
+
+                const supplyAPY =
+                  (1 + Number(supplyRatePerSecond) / 1e18) ** SECONDS_PER_YEAR -
+                  1;
+
+                const borrowAPY =
+                  (1 + Number(borrowRatePerSecond) / 1e18) ** SECONDS_PER_YEAR -
+                  1;
+
+                console.log(
+                  `${networkName} ${token} APY`,
+                  supplyAPY,
+                  borrowAPY,
+                );
+
+                return { network: networkName, token, supplyAPY, borrowAPY };
+              } catch (err) {
+                console.error(
+                  `❌ Compound error for ${networkName} ${token}:`,
+                  err,
+                );
+                throw err;
+              }
             }),
           );
+
+          console.log(`Finished network: ${networkName}`);
 
           return tokenResults
             .filter(
@@ -139,10 +195,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    console.log("Compound All APYS:", allAPYS);
+    console.log("\n✅ Compound All APYS:", allAPYS);
+
     res.status(200).json(allAPYS);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Internal server error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 }

@@ -4,7 +4,6 @@ import { JsonRpcProvider, Contract, getAddress } from "ethers";
 
 import { aave } from "../address/aave";
 
-import { USDC_str, USDT_str, WBTC_str, WETH_str } from "../address";
 import { AAVE_POOLS } from "../pools/aave";
 import {
   arbitrum_net,
@@ -13,6 +12,11 @@ import {
   avalanche_net,
   base_net,
   polygon_net,
+  linea_net,
+  scroll_net,
+  gnosis_net,
+  celo_net,
+  plasma_net,
 } from "../networks";
 
 // ======================
@@ -26,18 +30,15 @@ const providerList: Record<string, [JsonRpcProvider, string, Object]> = {
   avalanche: [avalanche_net, AAVE_POOLS.avalanche, aave.avalanche],
   base: [base_net, AAVE_POOLS.base, aave.base],
   polygon: [polygon_net, AAVE_POOLS.polygon, aave.polygon],
+  linea: [linea_net, AAVE_POOLS.linea, aave.linea],
+  scroll: [scroll_net, AAVE_POOLS.scroll, aave.scroll],
+  celo: [celo_net, AAVE_POOLS.celo, aave.celo],
+  plasma: [plasma_net, AAVE_POOLS.plasma, aave.plasma],
 };
 
 // ======================
 // TOKENS
 // ======================
-
-const addressList = {
-  usdc: getAddress(USDC_str),
-  usdt: getAddress(USDT_str),
-  btc: getAddress(WBTC_str),
-  eth: getAddress(WETH_str),
-};
 
 // ======================
 // AAVE ABI

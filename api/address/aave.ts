@@ -35,4 +35,23 @@ export const aave = {
     btc: getAddress("0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6"),
     eth: getAddress("0x7ceb23fd6bc0add59e62ac25578270cff1b9f619"),
   },
+  linea: {
+    usdc: getAddress("0x176211869ca2b568f2a7d4ee941e073a821ee1ff"),
+    usdt: getAddress("0xa219439258ca9da29e9cc4ce5596924745e12b93"),
+    btc: getAddress("0x3aab2285ddcddad8edf438c1bab47e1a9d05a9b4"),
+    eth: getAddress("0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f"),
+  },
+  scroll: {
+    usdc: getAddress("0x06efdbff2a14a7c8e15944d1f4a48f9f95f663a4"),
+    eth: getAddress("0x5300000000000000000000000000000000000004"),
+  },
+  celo: {
+    usdc: getAddress("0xceba9300f2b948710d2653dd7b07f33a8b32118c"),
+    usdt: getAddress("0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e"),
+    eth: getAddress("0xd221812de1bd094f35587ee8e174b07b6167d9af"),
+  },
+  plasma: {
+    usdt: getAddress("0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb"),
+    eth: getAddress("0x9895d81bb462a195b4922ed7de0e3acd007c32cb"),
+  },
 };

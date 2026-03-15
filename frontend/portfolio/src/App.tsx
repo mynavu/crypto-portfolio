@@ -7,8 +7,8 @@ type AaveApyFlat = Record<string, number>;
 type CompoundApyFlat = Record<string, number>;
 
 type RateEntry = {
-  protocol: string; // e.g. "AAVE"
-  network: string; // e.g. "Ethereum", "Arbitrum"
+  protocol: string;
+  network: string;
   supplyAPY: number | null;
   borrowAPY: number | null;
   link: string;
@@ -19,19 +19,27 @@ type RateEntry = {
 const assets = ["USDC", "USDT", "ETH", "BTC", "SOL"] as const;
 type Asset = (typeof assets)[number];
 
-const AAVE_NETWORKS: { key: string; label: string }[] = [
+const AAVE_NETWORKS = [
   { key: "ethereum", label: "Ethereum" },
   { key: "arbitrum", label: "Arbitrum" },
   { key: "optimism", label: "Optimism" },
   { key: "base", label: "Base" },
   { key: "polygon", label: "Polygon" },
   { key: "avalanche", label: "Avalanche" },
+  { key: "linea", label: "Linea" },
+  { key: "scroll", label: "Scroll" },
+  { key: "celo", label: "Celo" },
+  { key: "plasma", label: "Plasma" },
 ];
 
-const COMPOUND_NETWORKS: { key: string; label: string }[] = [
+const COMPOUND_NETWORKS = [
   { key: "ethereum", label: "Ethereum" },
   { key: "arbitrum", label: "Arbitrum" },
   { key: "optimism", label: "Optimism" },
+  { key: "base", label: "Base" },
+  { key: "linea", label: "Linea" },
+  { key: "polygon", label: "Polygon" },
+  { key: "scroll", label: "Scroll" },
 ];
 
 const COMPOUND_TOKEN_MAP: Partial<Record<Asset, string>> = {
@@ -46,7 +54,6 @@ const AAVE_TOKEN_MAP: Partial<Record<Asset, string>> = {
   USDT: "usdt",
   ETH: "eth",
   BTC: "btc",
-  // SOL not on AAVE
 };
 
 const AAVE_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> = {
@@ -62,29 +69,95 @@ const AAVE_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> = {
       "https://app.aave.com/reserve-overview/?underlyingAsset=0x2791bca1f2de4661ed88a30c99a7a9449aa84174&marketName=proto_polygon_v3",
     avalanche:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e&marketName=proto_avalanche_v3",
+    linea:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x176211869ca2b568f2a7d4ee941e073a821ee1ff&marketName=proto_linea_v3",
+    scroll:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x06efdbff2a14a7c8e15944d1f4a48f9f95f663a4&marketName=proto_scroll_v3",
+    celo: "https://app.aave.com/reserve-overview/?underlyingAsset=0xceba9300f2b948710d2653dd7b07f33a8b32118c&marketName=proto_celo_v3",
   },
   USDT: {
     ethereum:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xdac17f958d2ee523a2206206994597c13d831ec7&marketName=proto_mainnet_v3",
+    arbitrum:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9&marketName=proto_arbitrum_v3",
+    optimism:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x94b008aa00579c1307b0ef2c499ad98a8ce58e58&marketName=proto_optimism_v3",
+    polygon:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0xc2132d05d31c914a87c6611c10748aeb04b58e8f&marketName=proto_polygon_v3",
+    avalanche:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7&marketName=proto_avalanche_v3",
+    linea:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0xa219439258ca9da29e9cc4ce5596924745e12b93&marketName=proto_linea_v3",
+    celo: "https://app.aave.com/reserve-overview/?underlyingAsset=0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e&marketName=proto_celo_v3",
+    plasma:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb&marketName=proto_plasma_v3",
   },
   ETH: {
     ethereum:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3",
+    arbitrum:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x82af49447d8a07e3bd95bd0d56f35241523fbab1&marketName=proto_arbitrum_v3",
+    optimism:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x4200000000000000000000000000000000000006&marketName=proto_optimism_v3",
+    base: "https://app.aave.com/reserve-overview/?underlyingAsset=0x4200000000000000000000000000000000000006&marketName=proto_base_v3",
+    polygon:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x7ceb23fd6bc0add59e62ac25578270cff1b9f619&marketName=proto_polygon_v3",
+    avalanche:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x49d5c2bdffac6ce2bfdb6640f4f80f226bc10bab&marketName=proto_avalanche_v3",
+    linea:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6&marketName=proto_linea_v3", // WETH on Linea
+    scroll:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x5300000000000000000000000000000000000004&marketName=proto_scroll_v3",
+    celo: "https://app.aave.com/reserve-overview/?underlyingAsset=0xd221812de1bd094f35587ee8e174b07b6167d9af&marketName=proto_celo_v3",
+    plasma:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0xa3d68b74bf0528fdd07263c60d6488749044914b&marketName=proto_plasma_v3", // WETH
   },
   BTC: {
     ethereum:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0x2260fac5e5542a773aa44fbcfedf7c193bc2c599&marketName=proto_mainnet_v3",
+    arbitrum:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f&marketName=proto_arbitrum_v3",
+    optimism:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x68f180fcce6836688e9084f035309e29bf0a2095&marketName=proto_optimism_v3",
+    base: "",
+    polygon:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6&marketName=proto_polygon_v3",
+    avalanche:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x50b7545627a5162f82a992c33b87adc75187b218&marketName=proto_avalanche_v3", // WBTC.e
+    linea:
+      "https://app.aave.com/reserve-overview/?underlyingAsset=0x3aab2285ddcddad8edf438c1bab47e1a9d05a9b4&marketName=proto_linea_v3",
   },
 };
 
 const COMPOUND_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> =
   {
-    ETH: { ethereum: "https://app.compound.finance/markets/weth-mainnet" },
-    BTC: { ethereum: "https://app.compound.finance/markets/wbtc-mainnet" },
-    USDC: { ethereum: "https://app.compound.finance/markets/usdc-mainnet" },
-    USDT: { ethereum: "https://app.compound.finance/markets/usdt-mainnet" },
+    ETH: {
+      ethereum: "https://app.compound.finance/markets/weth-mainnet",
+      arbitrum: "https://app.compound.finance/markets/weth-arb",
+      optimism: "https://app.compound.finance/markets/weth-op",
+      base: "https://app.compound.finance/markets/weth-basemainnet",
+      linea: "https://app.compound.finance/markets/weth-linea",
+    },
+    BTC: {
+      ethereum: "https://app.compound.finance/markets/wbtc-mainnet",
+    },
+    USDC: {
+      ethereum: "https://app.compound.finance/markets/usdc-mainnet",
+      arbitrum: "https://app.compound.finance/markets/usdc-arb",
+      optimism: "https://app.compound.finance/markets/usdc-op",
+      base: "https://app.compound.finance/markets/usdc-basemainnet",
+      linea: "https://app.compound.finance/markets/usdc-linea",
+      polygon: "https://app.compound.finance/markets/usdc.e-polygon",
+      scroll: "https://app.compound.finance/markets/usdc-scroll",
+    },
+    USDT: {
+      ethereum: "https://app.compound.finance/markets/usdt-mainnet",
+      arbitrum: "https://app.compound.finance/markets/usd%E2%82%AE0-arb",
+      optimism: "https://app.compound.finance/markets/usdt-op",
+      polygon:
+        "https://polygonscan.com//address/0xaeB318360f27748Acb200CE616E389A6C9409a07",
+    },
   };
-
 const KAMINO_LINKS: Partial<Record<Asset, string>> = {
   USDC: "https://kamino.com/borrow/reserve/7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF/D6q6wuQSrifJKZYpR1M8R4YawnLDtDsMmWM1NbBmgJ59",
   USDT: "https://kamino.com/borrow/reserve/7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF/H3t6qZ1JkguCNTi9uzVKqQ7dvt2cum4XiXWom6Gn5e5S",
@@ -99,21 +172,33 @@ const SPARK_LINKS: Partial<Record<Asset, string>> = {
   BTC: "https://app.spark.fi/markets/1/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
 };
 
-const PROTOCOL_COLORS: Record<string, string> = {
-  AAVE: "#b6509e",
-  Compound: "#00d395",
-  Kamino: "#a3e635",
-  Spark: "#f59e0b",
+const PROTOCOL_STYLES: Record<string, { color: string; bg: string }> = {
+  AAVE: { color: "#d885ff", bg: "rgba(103, 34, 135,0.12)" },
+  COMPOUND: { color: "#54ff87", bg: "rgba(54, 145, 81, 0.10)" },
+  Kamino: { color: "#82daff", bg: "rgba(67, 147, 181, 0.10)" },
+  Spark: { color: "#fff178", bg: "rgba(184, 167, 26, 0.10)" },
 };
 
 const NETWORK_COLORS: Record<string, string> = {
   Ethereum: "#627eea",
   Arbitrum: "#28a0f0",
-  Optimism: "#ff0420",
-  Base: "#0052ff",
+  Optimism: "#ff3838",
+  Base: "#3874ff",
   Polygon: "#8247e5",
-  Avalanche: "#e84142",
+  Avalanche: "#ff8585",
   Solana: "#9945ff",
+  Celo: "#ffff26",
+  Scroll: "#ffe4ad",
+  Linea: "#85daff",
+  Plasma: "#84d18e",
+};
+
+const ASSET_COLORS: Record<string, string> = {
+  USDC: "#2775ca",
+  USDT: "#26a17b",
+  ETH: "#627eea",
+  BTC: "#f7931a",
+  SOL: "#9945ff",
 };
 
 // ─── Data Builders ────────────────────────────────────────────────────────────
@@ -121,7 +206,6 @@ const NETWORK_COLORS: Record<string, string> = {
 function buildAaveEntries(data: AaveApyFlat, asset: Asset): RateEntry[] {
   const tokenKey = AAVE_TOKEN_MAP[asset];
   if (!tokenKey) return [];
-
   return AAVE_NETWORKS.flatMap(({ key, label }) => {
     const supplyAPY = data[`${key}_${tokenKey}_supplyAPY`];
     const borrowAPY = data[`${key}_${tokenKey}_borrowAPY`];
@@ -144,7 +228,6 @@ function buildCompoundEntries(
 ): RateEntry[] {
   const tokenKey = COMPOUND_TOKEN_MAP[asset];
   if (!tokenKey) return [];
-
   return COMPOUND_NETWORKS.flatMap(({ key, label }) => {
     const supplyAPY = data[`${key}_${tokenKey}_supplyAPY`];
     const borrowAPY = data[`${key}_${tokenKey}_borrowAPY`];
@@ -161,7 +244,6 @@ function buildCompoundEntries(
   });
 }
 
-// Single-network protocol builder — duplicate + extend for multi-network Compound/Kamino later
 function buildSingleNetworkEntries(
   apyData: Record<string, number> | null,
   protocol: string,
@@ -210,7 +292,6 @@ function buildAllEntries(
     ETH: { supply: "ethSupplyAPY", borrow: "ethBorrowAPY" },
     BTC: { supply: "btcSupplyAPY", borrow: "btcBorrowAPY" },
   };
-
   return [
     ...(aaveFlat ? buildAaveEntries(aaveFlat, asset) : []),
     ...(compoundFlat ? buildCompoundEntries(compoundFlat, asset) : []),
@@ -235,6 +316,8 @@ function buildAllEntries(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+const VISIBLE_COUNT = 3;
+
 function RateRow({
   entry,
   type,
@@ -246,116 +329,64 @@ function RateRow({
 }) {
   const apy = type === "supply" ? entry.supplyAPY : entry.borrowAPY;
   if (apy == null) return null;
+
   const formatted = (apy * 100).toFixed(2) + "%";
-  const apyColor = type === "supply" ? "#4ade80" : "#f87171";
-  const protocolColor = PROTOCOL_COLORS[entry.protocol] ?? "#888";
+  const style = PROTOCOL_STYLES[entry.protocol] ?? {
+    color: "#888",
+    bg: "transparent",
+  };
   const networkColor = NETWORK_COLORS[entry.network] ?? "#666";
-  const isClickable = entry.link !== "";
   const isTop = rank === 0;
 
   const inner = (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "6px",
-        padding: "5px 7px",
-        borderRadius: "6px",
-        background: isTop ? "rgba(255,255,255,0.025)" : "transparent",
-        border: `1px solid ${isTop ? "rgba(255,255,255,0.055)" : "transparent"}`,
-        transition: "background 0.12s",
-        cursor: isClickable ? "pointer" : "default",
-      }}
+      className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-all duration-100 ${isTop ? "ring-1 ring-white/5 bg-white/[0.025]" : "hover:bg-white/[0.015]"}`}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "5px",
-          minWidth: 0,
-        }}
-      >
-        {/* Rank indicator */}
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Rank */}
         <span
-          style={{
-            fontSize: "8px",
-            fontWeight: 800,
-            color: rank === 0 ? "#ffd700" : rank === 1 ? "#999" : "#555",
-            width: "10px",
-            flexShrink: 0,
-            fontFamily: "monospace",
-          }}
+          className={`text-[10px] font-black font-mono w-4 shrink-0 ${rank === 0 ? "text-yellow-400" : rank === 1 ? "text-zinc-500" : "text-zinc-700"}`}
         >
           #{rank + 1}
         </span>
 
-        {/* Protocol dot + name */}
+        {/* Protocol badge */}
         <span
-          style={{
-            width: "5px",
-            height: "5px",
-            borderRadius: "50%",
-            background: protocolColor,
-            flexShrink: 0,
-          }}
-        />
-        <span
-          style={{
-            fontSize: "9px",
-            fontWeight: 700,
-            color: protocolColor,
-            letterSpacing: "0.07em",
-            fontFamily: "monospace",
-          }}
+          className="text-[9px] font-black font-mono tracking-wider px-1.5 py-0.5 rounded"
+          style={{ color: style.color, background: style.bg }}
         >
           {entry.protocol}
         </span>
 
         {/* Network */}
-        <span
-          style={{
-            fontSize: "9px",
-            color: networkColor,
-            opacity: 0.8,
-            letterSpacing: "0.04em",
-          }}
-        >
+        <span className="text-[10px] truncate" style={{ color: networkColor }}>
           {entry.network}
         </span>
       </div>
 
-      {/* APY */}
+      {/* APY value */}
       <span
-        style={{
-          fontSize: "12px",
-          fontWeight: 700,
-          color: apyColor,
-          letterSpacing: "0.02em",
-          flexShrink: 0,
-        }}
+        className={`text-sm font-black font-mono shrink-0 ${type === "supply" ? "text-emerald-400" : "text-rose-400"}`}
       >
         {formatted}
       </span>
     </div>
   );
 
-  if (!isClickable) return inner;
+  if (!entry.link) return <div>{inner}</div>;
   return (
     <a
       href={entry.link}
       target="_blank"
       rel="noopener noreferrer"
-      style={{ textDecoration: "none", display: "block" }}
+      className="block no-underline"
     >
       {inner}
     </a>
   );
 }
 
-const VISIBLE_COUNT = 3;
-
-function RateColumn({
+function RateList({
   entries,
   type,
 }: {
@@ -372,82 +403,41 @@ function RateColumn({
       return type === "supply" ? bv - av : av - bv;
     });
 
-  const color = type === "supply" ? "#4ade80" : "#f87171";
+  const visible = expanded ? valid : valid.slice(0, VISIBLE_COUNT);
+  const extra = valid.length - VISIBLE_COUNT;
 
   if (!valid.length) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-        <div
-          style={{
-            fontSize: "9px",
-            fontWeight: 700,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            color,
-            opacity: 0.5,
-            padding: "0 7px",
-            marginBottom: "2px",
-          }}
+      <div className="flex flex-col gap-1">
+        <p
+          className={`text-[10px] font-bold tracking-widest uppercase mb-1 ${type === "supply" ? "text-emerald-400" : "text-rose-400"}`}
         >
           {type === "supply" ? "▲ Supply" : "▼ Borrow"}
-        </div>
-        <span
-          style={{ color: "#2a2a2a", fontSize: "12px", padding: "5px 7px" }}
-        >
-          —
-        </span>
+        </p>
+        <span className="text-zinc-700 text-xs px-3 py-2">—</span>
       </div>
     );
   }
 
-  const visible = expanded ? valid : valid.slice(0, VISIBLE_COUNT);
-  const extra = valid.length - VISIBLE_COUNT;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-      {/* Header */}
-      <div
-        style={{
-          fontSize: "9px",
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color,
-          opacity: 0.55,
-          padding: "0 7px",
-          marginBottom: "2px",
-        }}
+    <div className="flex flex-col gap-0.5">
+      <p
+        className={`text-[10px] font-bold tracking-widest uppercase mb-2 px-3 ${type === "supply" ? "text-emerald-400" : "text-rose-400"}`}
       >
         {type === "supply" ? "▲ Supply" : "▼ Borrow"}
-      </div>
-
+      </p>
       {visible.map((entry, i) => (
         <RateRow
-          key={`${entry.protocol}-${entry.network}-${type}`}
+          key={`${entry.protocol}-${entry.network}`}
           entry={entry}
           type={type}
           rank={i}
         />
       ))}
-
       {extra > 0 && (
         <button
           onClick={() => setExpanded((e) => !e)}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: "3px 7px",
-            fontSize: "9px",
-            fontWeight: 600,
-            color: "#444",
-            letterSpacing: "0.08em",
-            textAlign: "left",
-            textTransform: "uppercase",
-            transition: "color 0.12s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "#777")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "#444")}
+          className="text-left text-[10px] font-semibold tracking-widest uppercase px-3 py-1.5 text-zinc-600 hover:text-zinc-400 transition-colors"
         >
           {expanded ? "↑ less" : `+ ${extra} more`}
         </button>
@@ -456,79 +446,102 @@ function RateColumn({
   );
 }
 
-function AssetCell({ entries }: { entries: RateEntry[] }) {
+function ShimmerRow() {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "0",
-        padding: "14px 10px",
-        minWidth: "320px",
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <RateColumn entries={entries} type="supply" />
+    <div className="flex items-center justify-between gap-2 px-3 py-2">
+      <div className="flex items-center gap-2 flex-1">
+        <div className="h-3 w-5 rounded bg-zinc-800 animate-pulse" />
+        <div className="h-4 w-14 rounded bg-zinc-800 animate-pulse" />
+        <div className="h-3 w-16 rounded bg-zinc-800 animate-pulse" />
       </div>
-      <div
-        style={{
-          width: "1px",
-          background: "#1a1a1a",
-          margin: "0 6px",
-          alignSelf: "stretch",
-        }}
-      />
-      <div style={{ flex: 1 }}>
-        <RateColumn entries={entries} type="borrow" />
-      </div>
+      <div className="h-4 w-12 rounded bg-zinc-800 animate-pulse" />
     </div>
   );
 }
 
-function LoadingAssetCell() {
+function LoadingCard() {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "0",
-        padding: "14px 10px",
-        minWidth: "320px",
-      }}
-    >
+    <div className="flex gap-4 p-4">
       {[0, 1].map((col) => (
-        <div
-          key={col}
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: "5px",
-          }}
-        >
-          <div
-            className="shimmer"
-            style={{
-              height: "9px",
-              width: "45px",
-              borderRadius: "3px",
-              marginBottom: "5px",
-            }}
-          />
-          {[1, 0.7, 0.4].map((op, i) => (
-            <div
-              key={i}
-              className="shimmer"
-              style={{ height: "28px", borderRadius: "5px", opacity: op }}
-            />
-          ))}
+        <div key={col} className="flex-1 flex flex-col gap-1">
+          <div className="h-3 w-12 rounded bg-zinc-800 animate-pulse mb-3" />
+          <ShimmerRow />
+          <ShimmerRow />
+          <ShimmerRow />
         </div>
       ))}
     </div>
   );
 }
 
+function AssetCard({
+  asset,
+  entries,
+  loading,
+}: {
+  asset: Asset;
+  entries: RateEntry[];
+  loading: boolean;
+}) {
+  const accentColor = ASSET_COLORS[asset] ?? "#888";
+
+  return (
+    <div className="bg-[#0a0a0a] border border-[#181818] rounded-2xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#141414] bg-[#070707]">
+        <div
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{
+            background: accentColor,
+            boxShadow: `0 0 8px ${accentColor}66`,
+          }}
+        />
+        <img
+          src={`/assets/tokens/${asset.toLowerCase()}_logo.png`}
+          alt={asset}
+          className="w-5 h-5 rounded-full object-contain"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <span className="text-sm font-black tracking-widest text-zinc-200 font-mono">
+          {asset}
+        </span>
+
+        {!loading && (
+          <div className="ml-auto flex gap-3 text-[10px] text-zinc-600 font-mono">
+            <span>
+              <span className="text-emerald-400">▲</span>{" "}
+              {entries.filter((e) => e.supplyAPY != null).length} markets
+            </span>
+            <span>
+              <span className="text-rose-400">▼</span>{" "}
+              {entries.filter((e) => e.borrowAPY != null).length} markets
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      {loading ? (
+        <LoadingCard />
+      ) : (
+        <div className="flex gap-0 divide-x divide-[#141414]">
+          <div className="flex-1 p-4">
+            <RateList entries={entries} type="supply" />
+          </div>
+          <div className="flex-1 p-4">
+            <RateList entries={entries} type="borrow" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-function App() {
+export default function App() {
   const [aaveFlat, setAaveFlat] = useState<AaveApyFlat | null>(null);
   const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(
     null,
@@ -562,178 +575,44 @@ function App() {
   }, []);
 
   return (
-    <div className="front flex flex-col items-center gap-8 py-16">
-      <h1 className="font-bold text-4xl">Yield Info Page</h1>
+    <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
+      {/* Header */}
+      <div className="max-w-2xl mx-auto mb-12">
+        <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-zinc-600 mb-3">
+          DeFi Rates
+        </p>
+        <h1 className="text-4xl font-black tracking-tight text-zinc-100">
+          Yield Overview
+        </h1>
+        <p className="mt-2 text-sm text-zinc-500">
+          Live supply &amp; borrow rates across AAVE, Compound, Kamino, and
+          Spark.
+        </p>
+      </div>
 
-      <style>{`
-        .yield-table {
-          border-collapse: collapse;
-          border: 1px solid #181818;
-          background: #0a0a0a;
-          border-radius: 14px;
-          overflow: hidden;
-          box-shadow: 0 0 80px rgba(0,0,0,0.9), 0 0 0 1px #161616;
-        }
-        .yield-table th, .yield-table td {
-          border: 1px solid #141414;
-          padding: 0;
-        }
-        .corner-th {
-          background: #070707;
-          padding: 16px 20px !important;
-        }
-        .asset-th {
-          background: #070707;
-          padding: 14px 16px !important;
-          text-align: left;
-        }
-        .asset-th-inner {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .asset-th-logo {
-          width: 22px;
-          height: 22px;
-          object-fit: contain;
-          border-radius: 50%;
-        }
-        .asset-th-name {
-          font-size: 13px;
-          font-weight: 700;
-          color: #c8c8c8;
-          letter-spacing: 0.05em;
-        }
-        .label-td {
-          background: #070707;
-          padding: 0 20px !important;
-          vertical-align: middle;
-          white-space: nowrap;
-        }
-        .data-td {
-          background: #0a0a0a;
-          vertical-align: top;
-          transition: background 0.12s;
-        }
-        .data-td:hover { background: #0d0d0d; }
+      {/* Cards — vertical stack */}
+      <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        {assets.map((asset) => (
+          <AssetCard
+            key={asset}
+            asset={asset}
+            loading={loading}
+            entries={buildAllEntries(
+              asset,
+              aaveFlat,
+              compoundAPY,
+              kaminoAPY,
+              sparkAPY,
+            )}
+          />
+        ))}
+      </div>
 
-        @keyframes shimmer {
-          0%   { background-position: -600px 0; }
-          100% { background-position:  600px 0; }
-        }
-        .shimmer {
-          background: linear-gradient(90deg, #111 25%, #1c1c1c 50%, #111 75%);
-          background-size: 1200px 100%;
-          animation: shimmer 1.5s infinite linear;
-        }
-      `}</style>
-
-      <table className="yield-table">
-        <thead>
-          <tr>
-            <th className="corner-th">
-              <span
-                style={{
-                  fontSize: "10px",
-                  color: "#383838",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
-                Token
-              </span>
-            </th>
-            {assets.map((asset) => (
-              <th key={asset} className="asset-th">
-                <div className="asset-th-inner">
-                  <img
-                    src={`/assets/tokens/${asset.toLowerCase()}_logo.png`}
-                    alt={asset}
-                    className="asset-th-logo"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display =
-                        "none";
-                    }}
-                  />
-                  <span className="asset-th-name">{asset}</span>
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="label-td">
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
-              >
-                <span
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    color: "#4ade80",
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  ▲ Supply
-                </span>
-                <div
-                  style={{
-                    width: "100%",
-                    height: "1px",
-                    background: "#1a1a1a",
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    color: "#f87171",
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  ▼ Borrow
-                </span>
-              </div>
-            </td>
-
-            {assets.map((asset) => (
-              <td key={asset} className="data-td">
-                {loading ? (
-                  <LoadingAssetCell />
-                ) : (
-                  <AssetCell
-                    entries={buildAllEntries(
-                      asset,
-                      aaveFlat,
-                      compoundAPY,
-                      kaminoAPY,
-                      sparkAPY,
-                    )}
-                  />
-                )}
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-
-      <p
-        style={{
-          fontSize: "10px",
-          color: "#2e2e2e",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-        }}
-      >
+      {/* Footer */}
+      <p className="max-w-2xl mx-auto mt-10 text-[10px] font-mono tracking-widest uppercase text-zinc-700 text-center">
         Supply ranked highest → lowest · Borrow ranked lowest → highest · #1 =
         best rate
       </p>
     </div>
   );
 }
-
-export default App;

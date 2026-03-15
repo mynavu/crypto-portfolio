@@ -31,13 +31,29 @@ export const avalanche_net = new JsonRpcProvider(
 );
 
 // Gnosis
-export const gnosis_net = new JsonRpcProvider(`https://rpc.gnosischain.com`);
+export const gnosis_net = new JsonRpcProvider(
+  `https://gnosis-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+);
 
 // Scroll
-export const scroll_net = new JsonRpcProvider(`https://rpc.scroll.io`);
+export const scroll_net = new JsonRpcProvider(
+  `https://scroll-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+);
 
 // Linea
-export const linea_net = new JsonRpcProvider(`https://rpc.linea.build`);
+export const linea_net = new JsonRpcProvider(
+  `https://linea-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+);
+
+// Celo
+export const celo_net = new JsonRpcProvider(
+  `https://celo-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+);
+
+// Plasma
+export const plasma_net = new JsonRpcProvider(
+  `https://plasma-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+);
 
 // Mantle
 export const mantle_net = new JsonRpcProvider(`https://rpc.mantle.xyz`);

@@ -1,5 +1,37 @@
+// import "dotenv/config";
+import { AppKitProvider } from "@reown/appkit/react";
+import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
+import { WagmiProvider } from "wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SolanaAdapter } from "@reown/appkit-adapter-solana";
+import { AppKitButton } from "@reown/appkit/react";
+import { useWriteContract } from "wagmi";
+
+import {
+  mainnet,
+  arbitrum,
+  optimism,
+  base,
+  polygon,
+  avalanche,
+  linea,
+  scroll,
+  celo,
+  plasma,
+} from "viem/chains";
 import { useState, useEffect } from "react";
 import axios from "axios";
+
+const { writeContract } = useWriteContract();
+
+async function approve() {
+  await writeContract({
+    address: USDC_ADDRESS,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [POOL_ADDRESS, amount],
+  });
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +107,7 @@ const AAVE_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> = {
       "https://app.aave.com/reserve-overview/?underlyingAsset=0x06efdbff2a14a7c8e15944d1f4a48f9f95f663a4&marketName=proto_scroll_v3",
     celo: "https://app.aave.com/reserve-overview/?underlyingAsset=0xceba9300f2b948710d2653dd7b07f33a8b32118c&marketName=proto_celo_v3",
   },
+
   USDT: {
     ethereum:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xdac17f958d2ee523a2206206994597c13d831ec7&marketName=proto_mainnet_v3",
@@ -92,6 +125,7 @@ const AAVE_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> = {
     plasma:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb&marketName=proto_plasma_v3",
   },
+
   ETH: {
     ethereum:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&marketName=proto_mainnet_v3",
@@ -112,6 +146,7 @@ const AAVE_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> = {
     plasma:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0xa3d68b74bf0528fdd07263c60d6488749044914b&marketName=proto_plasma_v3", // WETH
   },
+
   BTC: {
     ethereum:
       "https://app.aave.com/reserve-overview/?underlyingAsset=0x2260fac5e5542a773aa44fbcfedf7c193bc2c599&marketName=proto_mainnet_v3",
@@ -158,6 +193,7 @@ const COMPOUND_LINKS: Partial<Record<Asset, Partial<Record<string, string>>>> =
         "https://polygonscan.com//address/0xaeB318360f27748Acb200CE616E389A6C9409a07",
     },
   };
+
 const KAMINO_LINKS: Partial<Record<Asset, string>> = {
   USDC: "https://kamino.com/borrow/reserve/7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF/D6q6wuQSrifJKZYpR1M8R4YawnLDtDsMmWM1NbBmgJ59",
   USDT: "https://kamino.com/borrow/reserve/7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF/H3t6qZ1JkguCNTi9uzVKqQ7dvt2cum4XiXWom6Gn5e5S",
@@ -539,6 +575,8 @@ function AssetCard({
   );
 }
 
+const queryClient = new QueryClient();
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -551,6 +589,25 @@ export default function App() {
   );
   const [sparkAPY, setSparkAPY] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const wagmiAdapter = new WagmiAdapter({
+    networks: [
+      mainnet,
+      arbitrum,
+      optimism,
+      base,
+      polygon,
+      avalanche,
+      linea,
+      scroll,
+      celo,
+      plasma,
+    ],
+    projectId: import.meta.env.VITE_REOWN_ID!,
+  });
+  const solanaAdapter = new SolanaAdapter({
+    // config here
+  });
 
   useEffect(() => {
     const getYield = async () => {
@@ -575,44 +632,66 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
-      {/* Header */}
-      <div className="max-w-2xl mx-auto mb-12">
-        <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-zinc-600 mb-3">
-          DeFi Rates
-        </p>
-        <h1 className="text-4xl font-black tracking-tight text-zinc-100">
-          Yield Overview
-        </h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          Live supply &amp; borrow rates across AAVE, Compound, Kamino, and
-          Spark.
-        </p>
-      </div>
+    <AppKitProvider
+      projectId={import.meta.env.VITE_REOWN_ID!}
+      adapters={[wagmiAdapter, solanaAdapter]}
+      networks={[
+        mainnet,
+        arbitrum,
+        optimism,
+        base,
+        polygon,
+        avalanche,
+        linea,
+        scroll,
+        celo,
+        plasma,
+      ]}
+    >
+      <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <AppKitButton />
+          <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto mb-12">
+              <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-zinc-600 mb-3">
+                DeFi Rates
+              </p>
+              <h1 className="text-4xl font-black tracking-tight text-zinc-100">
+                Yield Overview
+              </h1>
+              <p className="mt-2 text-sm text-zinc-500">
+                Live supply &amp; borrow rates across AAVE, Compound, Kamino,
+                and Spark.
+              </p>
+            </div>
 
-      {/* Cards — vertical stack */}
-      <div className="max-w-2xl mx-auto flex flex-col gap-4">
-        {assets.map((asset) => (
-          <AssetCard
-            key={asset}
-            asset={asset}
-            loading={loading}
-            entries={buildAllEntries(
-              asset,
-              aaveFlat,
-              compoundAPY,
-              kaminoAPY,
-              sparkAPY,
-            )}
-          />
-        ))}
-      </div>
+            {/* Cards — vertical stack */}
+            <div className="max-w-2xl mx-auto flex flex-col gap-4">
+              {assets.map((asset) => (
+                <AssetCard
+                  key={asset}
+                  asset={asset}
+                  loading={loading}
+                  entries={buildAllEntries(
+                    asset,
+                    aaveFlat,
+                    compoundAPY,
+                    kaminoAPY,
+                    sparkAPY,
+                  )}
+                />
+              ))}
+            </div>
 
-      {/* Footer */}
-      <p className="max-w-2xl mx-auto mt-10 text-[10px] font-mono tracking-widest uppercase text-zinc-700 text-center">
-        Supply ranked highest → lowest · Borrow ranked lowest → highest · #1 =
-        best rate
-      </p>
-    </div>
+            {/* Footer */}
+            <p className="max-w-2xl mx-auto mt-10 text-[10px] font-mono tracking-widest uppercase text-zinc-700 text-center">
+              Supply ranked highest → lowest · Borrow ranked lowest → highest ·
+              #1 = best rate
+            </p>
+          </div>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </AppKitProvider>
   );
 }

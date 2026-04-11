@@ -8,15 +8,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@reown/appkit": "^1.8.19",
+    "@reown/appkit-adapter-solana": "^1.8.19",
+    "@reown/appkit-adapter-wagmi": "^1.8.19",
     "@tailwindcss/vite": "^4.1.18",
-    "@tanstack/react-query": "latest",
+    "@tanstack/react-query": "^5.97.0",
     "axios": "^1.13.2",
     "ogl": "^1.0.11",
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "^4.1.18",
-    "viem": "latest",
-    "wagmi": "latest"
+    "viem": "^2.47.12",
+    "wagmi": "^3.6.1"
   },
   "devDependencies": {
     "@types/react": "latest",

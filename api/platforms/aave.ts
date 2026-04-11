@@ -14,7 +14,6 @@ import {
   polygon_net,
   linea_net,
   scroll_net,
-  gnosis_net,
   celo_net,
   plasma_net,
 } from "../networks";

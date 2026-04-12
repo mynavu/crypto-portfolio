@@ -6,7 +6,12 @@ import {
 } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
-import { WagmiProvider, useSwitchChain, useReadContract } from "wagmi";
+import {
+  WagmiProvider,
+  useSwitchChain,
+  useReadContract,
+  useWriteContract,
+} from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AAVE_LINKS,
@@ -34,12 +39,21 @@ import {
 } from "viem/chains";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { tokenAddresses } from "./resources/tokenAddresses";
+import { TOKEN_ADDRESSES } from "./resources/tokenAddresses";
 import { erc20Abi, formatUnits } from "viem";
+import { ETH_POOL_ADDRESSES } from "./resources/poolAddresses";
+import {
+  Asset,
+  Token,
+  Address,
+  Protocol,
+  UpperCaseNetwork,
+} from "./shared.types";
 
 const { address, isConnected } = useAppKitAccount();
 const [amount, setAmount] = useState("");
-const { caipNetwork, caipNetworkId, chainId } = useAppKitNetwork();
+const { chainId } = useAppKitNetwork();
+const { writeContractAsync } = useWriteContract();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,8 +61,8 @@ type AaveApyFlat = Record<string, number>;
 type CompoundApyFlat = Record<string, number>;
 
 type RateEntry = {
-  protocol: string;
-  network: string;
+  protocol: Protocol;
+  network: UpperCaseNetwork;
   supplyAPY: number | null;
   borrowAPY: number | null;
   link: string;
@@ -57,7 +71,6 @@ type RateEntry = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const assets = ["USDC", "USDT", "ETH", "BTC", "SOL"] as const;
-type Asset = (typeof assets)[number];
 
 const COMPOUND_TOKEN_MAP: Partial<Record<Asset, string>> = {
   USDC: "usdc",
@@ -73,7 +86,7 @@ const AAVE_TOKEN_MAP: Partial<Record<Asset, string>> = {
   BTC: "btc",
 };
 
-const NETWORK_MAP: Record<number, keyof typeof tokenAddresses> = {
+const NETWORK_MAP: Record<number, keyof typeof TOKEN_ADDRESSES> = {
   1: "ethereum",
   42161: "arbitrum",
   10: "optimism",
@@ -131,8 +144,8 @@ function buildCompoundEntries(
 
 function buildSingleNetworkEntries(
   apyData: Record<string, number> | null,
-  protocol: string,
-  network: string,
+  protocol: Protocol,
+  network: UpperCaseNetwork,
   asset: Asset,
   links: Partial<Record<Asset, string>>,
   tokenKeyMap: Partial<Record<Asset, { supply: string; borrow: string }>>,
@@ -260,73 +273,146 @@ function RateRow({
 
   if (!entry.link) return <div>{inner}</div>;
   return (
-    <a
-      href={entry.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block no-underline"
-    >
-      {inner}
-    </a>
+    <div>
+      <a
+        href={entry.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block no-underline"
+      >
+        {inner}
+      </a>
+      <button onClick={() => setIsOpen(true)}>Deposite</button>
+    </div>
   );
 }
 
-type Token = "usdc" | "usdt" | "btc" | "eth";
-
-type Props = {
+type tokenProps = {
   token: Token;
 };
 
-export function DepositModal({ token }: Props) {
-  const [amount, setAmount] = useState("");
+const [isOpen, setIsOpen] = useState(false);
 
+function DepositModal({ token }: tokenProps) {
   if (!chainId) return null;
 
   const numericChainId =
     typeof chainId === "string" ? Number(chainId) : chainId;
 
   const networkKey = NETWORK_MAP[numericChainId];
-
   if (!networkKey) return <p>Unsupported network</p>;
 
-  const tokenAddress =
-    tokenAddresses[networkKey][
-      token as keyof (typeof tokenAddresses)[typeof networkKey]
-    ];
+  const tokenAddress = TOKEN_ADDRESSES[networkKey][token];
+  if (!tokenAddress) return <p>Unsupported token</p>;
 
   const { data: balance } = useReadContract({
     abi: erc20Abi,
-    address: tokenAddress ? (tokenAddress as `0x${string}`) : undefined,
+    address: tokenAddress ? (tokenAddress as Address) : undefined,
     functionName: "balanceOf",
-    args: address ? [address as `0x${string}`] : undefined,
+    args: address ? [address as Address] : undefined,
     query: {
       enabled: !!address && !!tokenAddress,
     },
   });
 
   return (
-    <dialog open>
+    <dialog open={isOpen}>
       <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
-
       <input
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder="0.0"
       />
-
-      <button>Confirm Deposit</button>
+      <button
+        onClick={() => {
+          handleDeposit(numericChainId, tokenAddress, networkKey);
+          setIsOpen(false); // closes the modal
+        }}
+      >
+        Confirm Deposit
+      </button>
     </dialog>
   );
 }
 
-async function handleDeposit(requiredChain: any) {
+async function approve(
+  tokenAddress: Address,
+  poolAddress: Address,
+  amount: bigint,
+) {
+  await writeContractAsync({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [poolAddress, amount],
+  });
+}
+
+const aavePoolAbi = [
+  {
+    name: "supply",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "onBehalfOf", type: "address" },
+      { name: "referralCode", type: "uint16" },
+    ],
+    outputs: [],
+  },
+];
+
+async function deposit(
+  poolAddress: Address,
+  tokenAddress: Address,
+  amount: bigint,
+  userAddress: Address,
+) {
+  await writeContractAsync({
+    address: poolAddress,
+    abi: aavePoolAbi,
+    functionName: "supply",
+    args: [tokenAddress, amount, userAddress, 0],
+  });
+}
+
+async function handleDeposit(
+  requiredChain: any,
+  tokenAddress: Address,
+  networkKey: string,
+) {
+  if (!address || !tokenAddress || !networkKey) return;
   if (chainId !== requiredChain) {
     const { switchChain } = useSwitchChain();
     await switchChain({ chainId: requiredChain });
+  }
+
+  const poolAddress: Address =
+    ETH_POOL_ADDRESSES[networkKey as keyof typeof ETH_POOL_ADDRESSES];
+
+  if (!poolAddress) {
+    console.error("Unsupported network for Aave");
     return;
   }
 
-  // continue with approve + deposit
+  const parsedAmount = parseInt(amount, 6);
+  const parsedAmountBigInt = BigInt(parsedAmount);
+
+  try {
+    await approve(tokenAddress, poolAddress, parsedAmountBigInt);
+
+    await deposit(
+      poolAddress,
+      tokenAddress as `0x${string}`,
+      parsedAmountBigInt,
+      address as `0x${string}`,
+    );
+
+    console.log("Deposit successful");
+  } catch (err) {
+    console.error("Deposit failed:", err);
+  }
 }
 
 function RateList({
@@ -558,6 +644,8 @@ export default function App() {
       <WagmiProvider config={wagmiAdapter.wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <AppKitButton />
+          {isConnected && <p>Wallet Connected</p>}
+          {isOpen && <DepositModal token="usdc" />}
           <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
             {/* Header */}
             <div className="max-w-2xl mx-auto mb-12">

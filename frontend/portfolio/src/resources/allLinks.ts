@@ -1,8 +1,7 @@
-const assets = ["USDC", "USDT", "ETH", "BTC", "SOL"] as const;
-type Asset = (typeof assets)[number];
+import { Network, Asset } from "../shared.types";
 
 export const AAVE_LINKS: Partial<
-  Record<Asset, Partial<Record<string, string>>>
+  Record<Asset, Partial<Record<Network, string>>>
 > = {
   USDC: {
     ethereum:
@@ -80,7 +79,7 @@ export const AAVE_LINKS: Partial<
 };
 
 export const COMPOUND_LINKS: Partial<
-  Record<Asset, Partial<Record<string, string>>>
+  Record<Asset, Partial<Record<Network, string>>>
 > = {
   ETH: {
     ethereum: "https://app.compound.finance/markets/weth-mainnet",

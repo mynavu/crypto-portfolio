@@ -1,9 +1,12 @@
-export const PROTOCOL_COLORS: Record<string, { color: string; bg: string }> = {
-  AAVE: { color: "#d885ff", bg: "rgba(103, 34, 135,0.12)" },
-  COMPOUND: { color: "#54ff87", bg: "rgba(54, 145, 81, 0.10)" },
-  Kamino: { color: "#82daff", bg: "rgba(67, 147, 181, 0.10)" },
-  Spark: { color: "#fff178", bg: "rgba(184, 167, 26, 0.10)" },
-};
+import { Asset, Protocol } from "../shared.types";
+
+export const PROTOCOL_COLORS: Record<Protocol, { color: string; bg: string }> =
+  {
+    AAVE: { color: "#d885ff", bg: "rgba(103, 34, 135,0.12)" },
+    COMPOUND: { color: "#54ff87", bg: "rgba(54, 145, 81, 0.10)" },
+    Kamino: { color: "#82daff", bg: "rgba(67, 147, 181, 0.10)" },
+    Spark: { color: "#fff178", bg: "rgba(184, 167, 26, 0.10)" },
+  };
 
 export const NETWORK_COLORS: Record<string, string> = {
   Ethereum: "#627eea",
@@ -19,7 +22,7 @@ export const NETWORK_COLORS: Record<string, string> = {
   Plasma: "#84d18e",
 };
 
-export const ASSET_COLORS: Record<string, string> = {
+export const ASSET_COLORS: Record<Asset, string> = {
   USDC: "#2775ca",
   USDT: "#26a17b",
   ETH: "#627eea",

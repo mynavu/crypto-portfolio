@@ -1,4 +1,11 @@
-export const AAVE_NETWORKS = [
+import { Network, UpperCaseNetwork } from "../shared.types";
+
+interface NetworkKeyValue {
+  key: Network;
+  label: UpperCaseNetwork;
+}
+
+export const AAVE_NETWORKS: NetworkKeyValue[] = [
   { key: "ethereum", label: "Ethereum" },
   { key: "arbitrum", label: "Arbitrum" },
   { key: "optimism", label: "Optimism" },
@@ -11,7 +18,7 @@ export const AAVE_NETWORKS = [
   { key: "plasma", label: "Plasma" },
 ];
 
-export const COMPOUND_NETWORKS = [
+export const COMPOUND_NETWORKS: NetworkKeyValue[] = [
   { key: "ethereum", label: "Ethereum" },
   { key: "arbitrum", label: "Arbitrum" },
   { key: "optimism", label: "Optimism" },

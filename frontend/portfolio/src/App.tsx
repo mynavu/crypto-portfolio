@@ -50,11 +50,6 @@ import {
   UpperCaseNetwork,
 } from "./shared.types";
 
-const { address, isConnected } = useAppKitAccount();
-const [amount, setAmount] = useState("");
-const { chainId } = useAppKitNetwork();
-const { writeContractAsync } = useWriteContract();
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AaveApyFlat = Record<string, number>;
@@ -79,7 +74,7 @@ const COMPOUND_TOKEN_MAP: Partial<Record<Asset, string>> = {
   BTC: "btc",
 };
 
-const AAVE_TOKEN_MAP: Partial<Record<Asset, string>> = {
+const AAVE_TOKEN_MAP: Partial<Record<Asset, Token>> = {
   USDC: "usdc",
   USDT: "usdt",
   ETH: "eth",
@@ -220,10 +215,20 @@ function RateRow({
   entry,
   type,
   rank,
+  setIsOpen,
+  token,
+  setDepositTarget,
 }: {
   entry: RateEntry;
   type: "supply" | "borrow";
   rank: number;
+  setIsOpen: (value: boolean) => void;
+  token: Token;
+  setDepositTarget: (params: {
+    token: Token;
+    network: UpperCaseNetwork;
+    protocol: Protocol;
+  }) => void;
 }) {
   const apy = type === "supply" ? entry.supplyAPY : entry.borrowAPY;
   if (apy == null) return null;
@@ -282,70 +287,20 @@ function RateRow({
       >
         {inner}
       </a>
-      <button onClick={() => setIsOpen(true)}>Deposite</button>
-    </div>
-  );
-}
-
-type tokenProps = {
-  token: Token;
-};
-
-const [isOpen, setIsOpen] = useState(false);
-
-function DepositModal({ token }: tokenProps) {
-  if (!chainId) return null;
-
-  const numericChainId =
-    typeof chainId === "string" ? Number(chainId) : chainId;
-
-  const networkKey = NETWORK_MAP[numericChainId];
-  if (!networkKey) return <p>Unsupported network</p>;
-
-  const tokenAddress = TOKEN_ADDRESSES[networkKey][token];
-  if (!tokenAddress) return <p>Unsupported token</p>;
-
-  const { data: balance } = useReadContract({
-    abi: erc20Abi,
-    address: tokenAddress ? (tokenAddress as Address) : undefined,
-    functionName: "balanceOf",
-    args: address ? [address as Address] : undefined,
-    query: {
-      enabled: !!address && !!tokenAddress,
-    },
-  });
-
-  return (
-    <dialog open={isOpen}>
-      <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
-      <input
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder="0.0"
-      />
       <button
         onClick={() => {
-          handleDeposit(numericChainId, tokenAddress, networkKey);
-          setIsOpen(false); // closes the modal
+          setIsOpen(true);
+          setDepositTarget({
+            token,
+            network: entry.network,
+            protocol: entry.protocol,
+          });
         }}
       >
-        Confirm Deposit
+        Deposit
       </button>
-    </dialog>
+    </div>
   );
-}
-
-async function approve(
-  tokenAddress: Address,
-  poolAddress: Address,
-  amount: bigint,
-) {
-  await writeContractAsync({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [poolAddress, amount],
-  });
 }
 
 const aavePoolAbi = [
@@ -363,64 +318,22 @@ const aavePoolAbi = [
   },
 ];
 
-async function deposit(
-  poolAddress: Address,
-  tokenAddress: Address,
-  amount: bigint,
-  userAddress: Address,
-) {
-  await writeContractAsync({
-    address: poolAddress,
-    abi: aavePoolAbi,
-    functionName: "supply",
-    args: [tokenAddress, amount, userAddress, 0],
-  });
-}
-
-async function handleDeposit(
-  requiredChain: any,
-  tokenAddress: Address,
-  networkKey: string,
-) {
-  if (!address || !tokenAddress || !networkKey) return;
-  if (chainId !== requiredChain) {
-    const { switchChain } = useSwitchChain();
-    await switchChain({ chainId: requiredChain });
-  }
-
-  const poolAddress: Address =
-    ETH_POOL_ADDRESSES[networkKey as keyof typeof ETH_POOL_ADDRESSES];
-
-  if (!poolAddress) {
-    console.error("Unsupported network for Aave");
-    return;
-  }
-
-  const parsedAmount = parseInt(amount, 6);
-  const parsedAmountBigInt = BigInt(parsedAmount);
-
-  try {
-    await approve(tokenAddress, poolAddress, parsedAmountBigInt);
-
-    await deposit(
-      poolAddress,
-      tokenAddress as `0x${string}`,
-      parsedAmountBigInt,
-      address as `0x${string}`,
-    );
-
-    console.log("Deposit successful");
-  } catch (err) {
-    console.error("Deposit failed:", err);
-  }
-}
-
 function RateList({
   entries,
   type,
+  setIsOpen,
+  token,
+  setDepositTarget,
 }: {
   entries: RateEntry[];
   type: "supply" | "borrow";
+  setIsOpen: (value: boolean) => void;
+  token: Token;
+  setDepositTarget: (params: {
+    token: Token;
+    network: UpperCaseNetwork;
+    protocol: Protocol;
+  }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -461,6 +374,9 @@ function RateList({
           entry={entry}
           type={type}
           rank={i}
+          setIsOpen={setIsOpen}
+          token={token}
+          setDepositTarget={setDepositTarget}
         />
       ))}
       {extra > 0 && (
@@ -507,12 +423,25 @@ function AssetCard({
   asset,
   entries,
   loading,
+  setIsOpen,
+  setDepositTarget,
 }: {
   asset: Asset;
   entries: RateEntry[];
   loading: boolean;
+  setIsOpen: (value: boolean) => void;
+  setDepositTarget: (params: {
+    token: Token;
+    network: UpperCaseNetwork;
+    protocol: Protocol;
+  }) => void;
 }) {
   const accentColor = ASSET_COLORS[asset] ?? "#888";
+
+  const token = AAVE_TOKEN_MAP[asset];
+  if (!token) {
+    return <p>Error</p>;
+  }
 
   return (
     <div className="bg-[#0a0a0a] border border-[#181818] rounded-2xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.8)]">
@@ -557,10 +486,22 @@ function AssetCard({
       ) : (
         <div className="flex gap-0 divide-x divide-[#141414]">
           <div className="flex-1 p-4">
-            <RateList entries={entries} type="supply" />
+            <RateList
+              entries={entries}
+              type="supply"
+              setIsOpen={setIsOpen}
+              token={token}
+              setDepositTarget={setDepositTarget}
+            />
           </div>
           <div className="flex-1 p-4">
-            <RateList entries={entries} type="borrow" />
+            <RateList
+              entries={entries}
+              type="borrow"
+              setIsOpen={setIsOpen}
+              token={token}
+              setDepositTarget={setDepositTarget}
+            />
           </div>
         </div>
       )}
@@ -573,6 +514,10 @@ const queryClient = new QueryClient();
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const { address, isConnected } = useAppKitAccount();
+  const [amount, setAmount] = useState("");
+  const { chainId } = useAppKitNetwork();
+  const { writeContractAsync } = useWriteContract();
   const [aaveFlat, setAaveFlat] = useState<AaveApyFlat | null>(null);
   const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(
     null,
@@ -582,6 +527,13 @@ export default function App() {
   );
   const [sparkAPY, setSparkAPY] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [depositTarget, setDepositTarget] = useState<{
+    token: Token;
+    network: UpperCaseNetwork;
+    protocol: Protocol;
+  } | null>(null);
+  const { switchChain } = useSwitchChain();
 
   const wagmiAdapter = new WagmiAdapter({
     networks: [
@@ -601,6 +553,117 @@ export default function App() {
   const solanaAdapter = new SolanaAdapter({
     // config here
   });
+
+  async function approve(
+    tokenAddress: Address,
+    poolAddress: Address,
+    amount: bigint,
+  ) {
+    await writeContractAsync({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [poolAddress, amount],
+    });
+  }
+
+  async function deposit(
+    poolAddress: Address,
+    tokenAddress: Address,
+    amount: bigint,
+    userAddress: Address,
+  ) {
+    await writeContractAsync({
+      address: poolAddress,
+      abi: aavePoolAbi,
+      functionName: "supply",
+      args: [tokenAddress, amount, userAddress, 0],
+    });
+  }
+
+  async function handleDeposit(
+    requiredChain: any,
+    tokenAddress: Address,
+    networkKey: string,
+  ) {
+    if (!address || !tokenAddress || !networkKey) return;
+    if (chainId !== requiredChain) {
+      await switchChain({ chainId: requiredChain });
+    }
+
+    const poolAddress: Address =
+      ETH_POOL_ADDRESSES[networkKey as keyof typeof ETH_POOL_ADDRESSES];
+
+    if (!poolAddress) {
+      console.error("Unsupported network for Aave");
+      return;
+    }
+
+    const parsedAmount = parseInt(amount, 6);
+    const parsedAmountBigInt = BigInt(parsedAmount);
+
+    try {
+      await approve(tokenAddress, poolAddress, parsedAmountBigInt);
+
+      await deposit(
+        poolAddress,
+        tokenAddress,
+        parsedAmountBigInt,
+        address as Address,
+      );
+
+      console.log("Deposit successful");
+    } catch (err) {
+      console.error("Deposit failed:", err);
+    }
+  }
+
+  type depositModalProps = {
+    token: Token;
+    setIsOpen: (value: boolean) => void;
+  };
+
+  function DepositModal({ token, setIsOpen }: depositModalProps) {
+    if (!chainId) return null;
+
+    const numericChainId =
+      typeof chainId === "string" ? Number(chainId) : chainId;
+
+    const networkKey = NETWORK_MAP[numericChainId];
+    if (!networkKey) return <p>Unsupported network</p>;
+
+    const tokenAddress = TOKEN_ADDRESSES[networkKey][token];
+    if (!tokenAddress) return <p>Unsupported token</p>;
+
+    const { data: balance } = useReadContract({
+      abi: erc20Abi,
+      address: tokenAddress ? (tokenAddress as Address) : undefined,
+      functionName: "balanceOf",
+      args: address ? [address as Address] : undefined,
+      query: {
+        enabled: !!address && !!tokenAddress,
+      },
+    });
+
+    return (
+      <dialog open={isOpen}>
+        <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
+        <input
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.0"
+        />
+        <button
+          onClick={() => {
+            handleDeposit(numericChainId, tokenAddress, networkKey);
+            setIsOpen(false); // closes the modal
+          }}
+        >
+          Confirm Deposit
+        </button>
+      </dialog>
+    );
+  }
 
   useEffect(() => {
     const getYield = async () => {
@@ -645,7 +708,9 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <AppKitButton />
           {isConnected && <p>Wallet Connected</p>}
-          {isOpen && <DepositModal token="usdc" />}
+          {isOpen && depositTarget !== null && (
+            <DepositModal token={depositTarget.token} setIsOpen={setIsOpen} />
+          )}
           <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
             {/* Header */}
             <div className="max-w-2xl mx-auto mb-12">
@@ -675,6 +740,8 @@ export default function App() {
                     kaminoAPY,
                     sparkAPY,
                   )}
+                  setIsOpen={setIsOpen}
+                  setDepositTarget={setDepositTarget}
                 />
               ))}
             </div>

@@ -1,5 +1,6 @@
 import { EthNetwork, Address } from "../shared.types";
 
+//AAVE
 export const ETH_POOL_ADDRESSES: Record<EthNetwork, Address> = {
   ethereum: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
   arbitrum: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",

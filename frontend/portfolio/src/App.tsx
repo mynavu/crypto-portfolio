@@ -40,8 +40,7 @@ import {
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { TOKEN_ADDRESSES } from "./resources/tokenAddresses";
-import { erc20Abi, formatUnits } from "viem";
-import { ETH_POOL_ADDRESSES } from "./resources/poolAddresses";
+import { erc20Abi, formatUnits, parseUnits } from "viem";
 import {
   Asset,
   Token,
@@ -69,6 +68,13 @@ type RateEntry = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const assets = ["USDC", "USDT", "ETH", "BTC", "SOL"] as const;
+
+const TOKEN_DECIMALS: Record<Token, number> = {
+  usdc: 6,
+  usdt: 6,
+  eth: 18,
+  btc: 8, // or 18 depending on your token
+};
 
 const COMPOUND_TOKEN_MAP: Partial<Record<Asset, string>> = {
   USDC: "usdc",
@@ -626,23 +632,27 @@ function AppInner() {
   ) {
     if (!address || !tokenAddress || !networkKey || depositTarget === null)
       return;
-    if (chainId !== requiredChain) {
-      await switchChain({ chainId: requiredChain });
-    }
-
-    const poolAddress: Address =
-      ETH_POOL_ADDRESSES[networkKey as keyof typeof ETH_POOL_ADDRESSES];
-
-    if (!poolAddress) {
-      console.error("Unsupported network for Aave");
+    if (
+      depositTarget.protocol === "COMPOUND" &&
+      depositTarget.token !== "usdc"
+    ) {
+      console.error("Compound only supports USDC on Ethereum");
       return;
     }
 
-    const parsedAmount = parseInt(amount, 6);
-    const parsedAmountBigInt = BigInt(parsedAmount);
+    if (chainId !== requiredChain) {
+      await switchChain({ chainId: requiredChain });
+      return; // wait for re-render
+    }
+
+    const decimals = TOKEN_DECIMALS[depositTarget.token];
+    const parsedAmountBigInt = parseUnits(amount, decimals);
 
     try {
-      await approve(tokenAddress, poolAddress, parsedAmountBigInt);
+      const config = PROTOCOL_CONFIG[depositTarget.protocol as EthProtocol];
+      const contractAddress = config.poolAddresses[networkKey] as Address;
+
+      await approve(tokenAddress, contractAddress, parsedAmountBigInt);
 
       await deposit({
         protocol: depositTarget.protocol as EthProtocol,
@@ -697,9 +707,13 @@ function AppInner() {
           placeholder="0.0"
         />
         <button
-          onClick={() => {
-            handleDeposit(numericChainId, tokenAddress, networkKey);
-            setIsOpen(false); // closes the modal
+          onClick={async () => {
+            try {
+              await handleDeposit(numericChainId, tokenAddress, networkKey);
+              setIsOpen(false); // closes the modal
+            } catch (e) {
+              console.error(e);
+            }
           }}
         >
           Confirm Deposit

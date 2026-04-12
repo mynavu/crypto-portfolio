@@ -48,7 +48,10 @@ import {
   Address,
   Protocol,
   UpperCaseNetwork,
+  EthProtocol,
+  EthNetwork,
 } from "./shared.types";
+import { PROTOCOL_CONFIG } from "./resources/protocolConfig";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -303,21 +306,6 @@ function RateRow({
   );
 }
 
-const aavePoolAbi = [
-  {
-    name: "supply",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "asset", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "onBehalfOf", type: "address" },
-      { name: "referralCode", type: "uint16" },
-    ],
-    outputs: [],
-  },
-];
-
 function RateList({
   entries,
   type,
@@ -514,6 +502,52 @@ const queryClient = new QueryClient();
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const wagmiAdapter = new WagmiAdapter({
+    networks: [
+      mainnet,
+      arbitrum,
+      optimism,
+      base,
+      polygon,
+      avalanche,
+      linea,
+      scroll,
+      celo,
+      plasma,
+    ],
+    projectId: import.meta.env.VITE_REOWN_ID!,
+  });
+  const solanaAdapter = new SolanaAdapter({
+    // config here
+  });
+
+  return (
+    <AppKitProvider
+      projectId={import.meta.env.VITE_REOWN_ID!}
+      adapters={[wagmiAdapter, solanaAdapter]}
+      networks={[
+        mainnet,
+        arbitrum,
+        optimism,
+        base,
+        polygon,
+        avalanche,
+        linea,
+        scroll,
+        celo,
+        plasma,
+      ]}
+    >
+      <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <AppInner />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </AppKitProvider>
+  );
+}
+
+function AppInner() {
   const { address, isConnected } = useAppKitAccount();
   const [amount, setAmount] = useState("");
   const { chainId } = useAppKitNetwork();
@@ -535,25 +569,6 @@ export default function App() {
   } | null>(null);
   const { switchChain } = useSwitchChain();
 
-  const wagmiAdapter = new WagmiAdapter({
-    networks: [
-      mainnet,
-      arbitrum,
-      optimism,
-      base,
-      polygon,
-      avalanche,
-      linea,
-      scroll,
-      celo,
-      plasma,
-    ],
-    projectId: import.meta.env.VITE_REOWN_ID!,
-  });
-  const solanaAdapter = new SolanaAdapter({
-    // config here
-  });
-
   async function approve(
     tokenAddress: Address,
     poolAddress: Address,
@@ -567,26 +582,50 @@ export default function App() {
     });
   }
 
-  async function deposit(
-    poolAddress: Address,
-    tokenAddress: Address,
-    amount: bigint,
-    userAddress: Address,
-  ) {
-    await writeContractAsync({
-      address: poolAddress,
-      abi: aavePoolAbi,
-      functionName: "supply",
-      args: [tokenAddress, amount, userAddress, 0],
-    });
+  async function deposit({
+    protocol,
+    networkKey,
+    tokenAddress,
+    amount,
+    userAddress,
+  }: {
+    protocol: EthProtocol;
+    networkKey: EthNetwork;
+    tokenAddress: Address;
+    amount: bigint;
+    userAddress: Address;
+  }) {
+    const config = PROTOCOL_CONFIG[protocol];
+    const contractAddress = config.poolAddresses[networkKey];
+
+    if (!contractAddress) throw new Error("Unsupported network");
+
+    if (protocol === "compound") {
+      // Compound
+      await writeContractAsync({
+        address: contractAddress,
+        abi: config.abi,
+        functionName: "supply",
+        args: [tokenAddress, amount],
+      });
+    } else {
+      // Aave + Spark
+      await writeContractAsync({
+        address: contractAddress,
+        abi: config.abi,
+        functionName: "supply",
+        args: [tokenAddress, amount, userAddress, 0],
+      });
+    }
   }
 
   async function handleDeposit(
     requiredChain: any,
     tokenAddress: Address,
-    networkKey: string,
+    networkKey: EthNetwork,
   ) {
-    if (!address || !tokenAddress || !networkKey) return;
+    if (!address || !tokenAddress || !networkKey || depositTarget === null)
+      return;
     if (chainId !== requiredChain) {
       await switchChain({ chainId: requiredChain });
     }
@@ -605,12 +644,13 @@ export default function App() {
     try {
       await approve(tokenAddress, poolAddress, parsedAmountBigInt);
 
-      await deposit(
-        poolAddress,
+      await deposit({
+        protocol: depositTarget.protocol as EthProtocol,
+        networkKey,
         tokenAddress,
-        parsedAmountBigInt,
-        address as Address,
-      );
+        amount: parsedAmountBigInt,
+        userAddress: address as Address,
+      });
 
       console.log("Deposit successful");
     } catch (err) {
@@ -647,6 +687,9 @@ export default function App() {
 
     return (
       <dialog open={isOpen}>
+        <p>Coin: {depositTarget?.token}</p>
+        <p>Network: {depositTarget?.network}</p>
+        <p>Protocol: {depositTarget?.protocol}</p>
         <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
         <input
           value={amount}
@@ -688,72 +731,53 @@ export default function App() {
   }, []);
 
   return (
-    <AppKitProvider
-      projectId={import.meta.env.VITE_REOWN_ID!}
-      adapters={[wagmiAdapter, solanaAdapter]}
-      networks={[
-        mainnet,
-        arbitrum,
-        optimism,
-        base,
-        polygon,
-        avalanche,
-        linea,
-        scroll,
-        celo,
-        plasma,
-      ]}
-    >
-      <WagmiProvider config={wagmiAdapter.wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <AppKitButton />
-          {isConnected && <p>Wallet Connected</p>}
-          {isOpen && depositTarget !== null && (
-            <DepositModal token={depositTarget.token} setIsOpen={setIsOpen} />
-          )}
-          <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
-            {/* Header */}
-            <div className="max-w-2xl mx-auto mb-12">
-              <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-zinc-600 mb-3">
-                DeFi Rates
-              </p>
-              <h1 className="text-4xl font-black tracking-tight text-zinc-100">
-                Yield Overview
-              </h1>
-              <p className="mt-2 text-sm text-zinc-500">
-                Live supply &amp; borrow rates across AAVE, Compound, Kamino,
-                and Spark.
-              </p>
-            </div>
+    <>
+      <AppKitButton />
+      {isConnected && <p>Wallet Connected</p>}
+      {isOpen && depositTarget !== null && (
+        <DepositModal token={depositTarget.token} setIsOpen={setIsOpen} />
+      )}
+      <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
+        {/* Header */}
+        <div className="max-w-2xl mx-auto mb-12">
+          <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-zinc-600 mb-3">
+            DeFi Rates
+          </p>
+          <h1 className="text-4xl font-black tracking-tight text-zinc-100">
+            Yield Overview
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500">
+            Live supply &amp; borrow rates across AAVE, Compound, Kamino, and
+            Spark.
+          </p>
+        </div>
 
-            {/* Cards — vertical stack */}
-            <div className="max-w-2xl mx-auto flex flex-col gap-4">
-              {assets.map((asset) => (
-                <AssetCard
-                  key={asset}
-                  asset={asset}
-                  loading={loading}
-                  entries={buildAllEntries(
-                    asset,
-                    aaveFlat,
-                    compoundAPY,
-                    kaminoAPY,
-                    sparkAPY,
-                  )}
-                  setIsOpen={setIsOpen}
-                  setDepositTarget={setDepositTarget}
-                />
-              ))}
-            </div>
+        {/* Cards — vertical stack */}
+        <div className="max-w-2xl mx-auto flex flex-col gap-4">
+          {assets.map((asset) => (
+            <AssetCard
+              key={asset}
+              asset={asset}
+              loading={loading}
+              entries={buildAllEntries(
+                asset,
+                aaveFlat,
+                compoundAPY,
+                kaminoAPY,
+                sparkAPY,
+              )}
+              setIsOpen={setIsOpen}
+              setDepositTarget={setDepositTarget}
+            />
+          ))}
+        </div>
 
-            {/* Footer */}
-            <p className="max-w-2xl mx-auto mt-10 text-[10px] font-mono tracking-widest uppercase text-zinc-700 text-center">
-              Supply ranked highest → lowest · Borrow ranked lowest → highest ·
-              #1 = best rate
-            </p>
-          </div>
-        </QueryClientProvider>
-      </WagmiProvider>
-    </AppKitProvider>
+        {/* Footer */}
+        <p className="max-w-2xl mx-auto mt-10 text-[10px] font-mono tracking-widest uppercase text-zinc-700 text-center">
+          Supply ranked highest → lowest · Borrow ranked lowest → highest · #1 =
+          best rate
+        </p>
+      </div>
+    </>
   );
 }

@@ -35,6 +35,8 @@ type UpperCaseNetwork =
   | "Celo"
   | "Plasma"
   | "Solana";
+
+type EthProtocol = "aave" | "spark" | "compound";
 type Address = `0x${string}`;
 type Protocol = "AAVE" | "COMPOUND" | "Kamino" | "Spark";
 
@@ -46,4 +48,5 @@ export type {
   Address,
   Protocol,
   EthNetwork,
+  EthProtocol,
 };

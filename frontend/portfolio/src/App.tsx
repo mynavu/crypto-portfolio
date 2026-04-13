@@ -237,17 +237,18 @@ function RateRow({
   rank,
   setIsOpen,
   token,
-  setDepositTarget,
+  setTransactionTarget,
 }: {
   entry: RateEntry;
   type: "supply" | "borrow";
   rank: number;
   setIsOpen: (value: boolean) => void;
   token: Token;
-  setDepositTarget: (params: {
+  setTransactionTarget: (params: {
     token: Token;
     network: UpperCaseNetwork;
     protocol: Protocol;
+    type: "borrow" | "supply";
   }) => void;
 }) {
   const apy = type === "supply" ? entry.supplyAPY : entry.borrowAPY;
@@ -311,14 +312,15 @@ function RateRow({
       <button
         onClick={() => {
           setIsOpen(true);
-          setDepositTarget({
+          setTransactionTarget({
             token,
             network: entry.network,
             protocol: entry.protocol,
+            type,
           });
         }}
       >
-        Deposit
+        {type === "supply" ? "Deposit" : "Borrow"}
       </button>
     </div>
   );
@@ -335,14 +337,15 @@ function RateRow({
       <button
         onClick={() => {
           setIsOpen(true);
-          setDepositTarget({
+          setTransactionTarget({
             token,
             network: entry.network,
             protocol: entry.protocol,
+            type,
           });
         }}
       >
-        Deposit
+        {type === "supply" ? "Deposit" : "Borrow"}
       </button>
     </div>
   );
@@ -353,16 +356,17 @@ function RateList({
   type,
   setIsOpen,
   token,
-  setDepositTarget,
+  setTransactionTarget,
 }: {
   entries: RateEntry[];
   type: "supply" | "borrow";
   setIsOpen: (value: boolean) => void;
   token: Token;
-  setDepositTarget: (params: {
+  setTransactionTarget: (params: {
     token: Token;
     network: UpperCaseNetwork;
     protocol: Protocol;
+    type: "borrow" | "supply";
   }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -406,7 +410,7 @@ function RateList({
           rank={i}
           setIsOpen={setIsOpen}
           token={token}
-          setDepositTarget={setDepositTarget}
+          setTransactionTarget={setTransactionTarget}
         />
       ))}
       {extra > 0 && (
@@ -454,16 +458,17 @@ function AssetCard({
   entries,
   loading,
   setIsOpen,
-  setDepositTarget,
+  setTransactionTarget,
 }: {
   asset: Asset;
   entries: RateEntry[];
   loading: boolean;
   setIsOpen: (value: boolean) => void;
-  setDepositTarget: (params: {
+  setTransactionTarget: (params: {
     token: Token;
     network: UpperCaseNetwork;
     protocol: Protocol;
+    type: "borrow" | "supply";
   }) => void;
 }) {
   const accentColor = ASSET_COLORS[asset] ?? "#888";
@@ -521,7 +526,7 @@ function AssetCard({
               type="supply"
               setIsOpen={setIsOpen}
               token={token}
-              setDepositTarget={setDepositTarget}
+              setTransactionTarget={setTransactionTarget}
             />
           </div>
           <div className="flex-1 p-4">
@@ -530,7 +535,7 @@ function AssetCard({
               type="borrow"
               setIsOpen={setIsOpen}
               token={token}
-              setDepositTarget={setDepositTarget}
+              setTransactionTarget={setTransactionTarget}
             />
           </div>
         </div>
@@ -540,7 +545,7 @@ function AssetCard({
 }
 
 const queryClient = new QueryClient();
-type depositModalProps = {
+type TransactionModalProps = {
   token: Token;
   isOpen: boolean;
   setIsOpen: (value: boolean) => void;
@@ -548,19 +553,21 @@ type depositModalProps = {
   address: string | undefined;
   amount: string;
   setAmount: (value: string) => void;
-  depositTarget: {
+  transactionTarget: {
     token: Token;
     network: UpperCaseNetwork;
     protocol: Protocol;
+    type: "borrow" | "supply";
   } | null;
-  handleDeposit: (
+  handleTransaction: (
     requiredChain: number,
     tokenAddress: Address,
     networkKey: EthNetwork,
+    type: "borrow" | "supply",
   ) => Promise<void>;
 };
 
-function DepositModal({
+function TransactionModal({
   token,
   isOpen,
   setIsOpen,
@@ -568,10 +575,10 @@ function DepositModal({
   address,
   amount,
   setAmount,
-  depositTarget,
-  handleDeposit,
-}: depositModalProps) {
-  if (!chainId) return null;
+  transactionTarget,
+  handleTransaction,
+}: TransactionModalProps) {
+  if (!chainId || !transactionTarget) return null;
   const numericChainId =
     typeof chainId === "string" ? Number(chainId) : chainId;
   const networkKey = NETWORK_MAP[numericChainId];
@@ -590,24 +597,24 @@ function DepositModal({
     },
   });
 
-  console.log(
-    "chainId:",
-    chainId,
-    "networkKey:",
-    networkKey,
-    "tokenAddress:",
-    tokenAddress,
-    "address:",
-    address,
-    "balance:",
-    balance,
-  );
+  // console.log(
+  //   "chainId:",
+  //   chainId,
+  //   "networkKey:",
+  //   networkKey,
+  //   "tokenAddress:",
+  //   tokenAddress,
+  //   "address:",
+  //   address,
+  //   "balance:",
+  //   balance,
+  // );
 
   return (
     <dialog open={isOpen}>
-      <p>Coin: {depositTarget?.token}</p>
-      <p>Network: {depositTarget?.network}</p>
-      <p>Protocol: {depositTarget?.protocol}</p>
+      <p>Coin: {transactionTarget?.token}</p>
+      <p>Network: {transactionTarget?.network}</p>
+      <p>Protocol: {transactionTarget?.protocol}</p>
       <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
       <input
         value={amount}
@@ -617,14 +624,21 @@ function DepositModal({
       <button
         onClick={async () => {
           try {
-            await handleDeposit(numericChainId, tokenAddress, networkKey);
+            await handleTransaction(
+              numericChainId,
+              tokenAddress,
+              networkKey,
+              transactionTarget.type,
+            );
             setIsOpen(false);
           } catch (e) {
             console.error(e);
           }
         }}
       >
-        Confirm Deposit
+        {transactionTarget.type === "supply"
+          ? "Confirm Deposit"
+          : "Confirm Borrow"}
       </button>
     </dialog>
   );
@@ -694,10 +708,11 @@ function AppInner() {
   const [sparkAPY, setSparkAPY] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
-  const [depositTarget, setDepositTarget] = useState<{
+  const [transactionTarget, setTransactionTarget] = useState<{
     token: Token;
     network: UpperCaseNetwork;
     protocol: Protocol;
+    type: "borrow" | "supply";
   } | null>(null);
   // const { switchChain } = useSwitchChain();
 
@@ -714,6 +729,40 @@ function AppInner() {
     });
   }
 
+  async function borrow({
+    protocol,
+    networkKey,
+    tokenAddress,
+    amount,
+  }: {
+    protocol: EthProtocol;
+    networkKey: EthNetwork;
+    tokenAddress: Address;
+    amount: bigint;
+  }) {
+    const config = PROTOCOL_CONFIG[protocol.toLowerCase() as EthProtocol];
+    const contractAddress = config.poolAddresses[networkKey];
+
+    if (!contractAddress) throw new Error("Unsupported network");
+
+    if (protocol === "compound") {
+      await writeContractAsync({
+        address: contractAddress,
+        abi: config.abi,
+        functionName: "withdraw",
+        args: [tokenAddress, amount],
+      });
+    } else {
+      // Aave + Spark — 2 = variable rate, almost always what you want
+      await writeContractAsync({
+        address: contractAddress,
+        abi: config.abi,
+        functionName: "borrow",
+        args: [tokenAddress, amount, 2, 0, address],
+      });
+    }
+  }
+
   async function deposit({
     protocol,
     networkKey,
@@ -727,7 +776,7 @@ function AppInner() {
     amount: bigint;
     userAddress: Address;
   }) {
-    const config = PROTOCOL_CONFIG[protocol];
+    const config = PROTOCOL_CONFIG[protocol.toLowerCase() as EthProtocol];
     const contractAddress = config.poolAddresses[networkKey];
 
     if (!contractAddress) throw new Error("Unsupported network");
@@ -751,16 +800,17 @@ function AppInner() {
     }
   }
 
-  async function handleDeposit(
+  async function handleTransaction(
     requiredChain: any,
     tokenAddress: Address,
     networkKey: EthNetwork,
+    type: "borrow" | "supply",
   ) {
-    if (!address || !tokenAddress || !networkKey || depositTarget === null)
+    if (!address || !tokenAddress || !networkKey || transactionTarget === null)
       return;
     if (
-      depositTarget.protocol === "COMPOUND" &&
-      depositTarget.token !== "usdc"
+      transactionTarget.protocol === "COMPOUND" &&
+      transactionTarget.token !== "usdc"
     ) {
       console.error("Compound only supports USDC on Ethereum");
       return;
@@ -781,32 +831,43 @@ function AppInner() {
       "Network Key:",
       networkKey,
       "Deposit Target:",
-      depositTarget,
+      transactionTarget,
     );
 
-    const decimals = TOKEN_DECIMALS[depositTarget.token];
+    const decimals = TOKEN_DECIMALS[transactionTarget.token];
     const parsedAmountBigInt = parseUnits(amount, decimals);
 
     try {
       const config =
-        PROTOCOL_CONFIG[depositTarget.protocol.toLowerCase() as EthProtocol];
+        PROTOCOL_CONFIG[
+          transactionTarget.protocol.toLowerCase() as EthProtocol
+        ];
       const contractAddress = config.poolAddresses[networkKey] as Address;
 
       console.log("config:", config, "Contract Address:", contractAddress);
 
       await approve(tokenAddress, contractAddress, parsedAmountBigInt);
 
-      await deposit({
-        protocol: depositTarget.protocol as EthProtocol,
-        networkKey,
-        tokenAddress,
-        amount: parsedAmountBigInt,
-        userAddress: address as Address,
-      });
+      if (type === "supply") {
+        await deposit({
+          protocol: transactionTarget.protocol as EthProtocol,
+          networkKey,
+          tokenAddress,
+          amount: parsedAmountBigInt,
+          userAddress: address as Address,
+        });
+      } else {
+        await borrow({
+          protocol: transactionTarget.protocol as EthProtocol,
+          networkKey,
+          tokenAddress,
+          amount: parsedAmountBigInt,
+        });
+      }
 
-      console.log("Deposit successful");
+      console.log("Transaction successful");
     } catch (err) {
-      console.error("Deposit failed:", err);
+      console.error("Transaction failed:", err);
     }
   }
 
@@ -836,17 +897,17 @@ function AppInner() {
     <>
       <AppKitButton />
       {isConnected && <p>Wallet Connected</p>}
-      {isOpen && depositTarget !== null && (
-        <DepositModal
-          token={depositTarget.token}
+      {isOpen && transactionTarget !== null && (
+        <TransactionModal
+          token={transactionTarget.token}
           isOpen={isOpen}
           setIsOpen={setIsOpen}
           chainId={chainId}
           address={address}
           amount={amount}
           setAmount={setAmount}
-          depositTarget={depositTarget}
-          handleDeposit={handleDeposit}
+          transactionTarget={transactionTarget}
+          handleTransaction={handleTransaction}
         />
       )}
       <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
@@ -879,7 +940,7 @@ function AppInner() {
                 sparkAPY,
               )}
               setIsOpen={setIsOpen}
-              setDepositTarget={setDepositTarget}
+              setTransactionTarget={setTransactionTarget}
             />
           ))}
         </div>

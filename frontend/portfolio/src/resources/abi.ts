@@ -19,11 +19,34 @@ export const aavePoolAbi: Abi[] = [
     ],
     outputs: [],
   },
+  {
+    name: "borrow",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "interestRateMode", type: "uint256" }, // 1 = stable, 2 = variable
+      { name: "referralCode", type: "uint16" },
+      { name: "onBehalfOf", type: "address" },
+    ],
+    outputs: [],
+  },
 ];
 
 export const compoundAbi: Abi[] = [
   {
     name: "supply",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "withdraw", // Compound calls it withdraw, not borrow
     type: "function",
     stateMutability: "nonpayable",
     inputs: [

@@ -12,4 +12,5 @@ export const ETH_POOL_ADDRESSES: Record<EthNetwork, Address> = {
   linea: "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
   celo: "0x3E59A31363E2ad014dcbc521c4a0d5757d9f3402",
   plasma: "0x925a2A7214Ed92428B5b1B090F80b25700095e12",
+  sepolia: "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
 };

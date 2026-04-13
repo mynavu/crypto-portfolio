@@ -8,7 +8,7 @@ import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
 import {
   WagmiProvider,
-  useSwitchChain,
+  // useSwitchChain,
   useReadContract,
   useWriteContract,
 } from "wagmi";
@@ -36,6 +36,7 @@ import {
   scroll,
   celo,
   plasma,
+  sepolia,
 } from "viem/chains";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -74,6 +75,15 @@ const TOKEN_DECIMALS: Record<Token, number> = {
   usdt: 6,
   eth: 18,
   btc: 8, // or 18 depending on your token
+  sol: 6,
+};
+
+const TOKEN_MAP: Partial<Record<Asset, Token>> = {
+  USDC: "usdc",
+  USDT: "usdt",
+  ETH: "eth",
+  BTC: "btc",
+  SOL: "sol",
 };
 
 const COMPOUND_TOKEN_MAP: Partial<Record<Asset, string>> = {
@@ -101,6 +111,7 @@ const NETWORK_MAP: Record<number, keyof typeof TOKEN_ADDRESSES> = {
   534352: "scroll",
   42220: "celo",
   9745: "plasma",
+  11155111: "sepolia",
 };
 
 // ─── Data Builders ────────────────────────────────────────────────────────────
@@ -284,8 +295,33 @@ function RateRow({
       </span>
     </div>
   );
-
-  if (!entry.link) return <div>{inner}</div>;
+  return (
+    <div>
+      {entry.link && (
+        <a
+          href={entry.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block no-underline"
+        >
+          {inner}
+        </a>
+      )}
+      {!entry.link && <div>{inner}</div>}
+      <button
+        onClick={() => {
+          setIsOpen(true);
+          setDepositTarget({
+            token,
+            network: entry.network,
+            protocol: entry.protocol,
+          });
+        }}
+      >
+        Deposit
+      </button>
+    </div>
+  );
   return (
     <div>
       <a
@@ -432,7 +468,7 @@ function AssetCard({
 }) {
   const accentColor = ASSET_COLORS[asset] ?? "#888";
 
-  const token = AAVE_TOKEN_MAP[asset];
+  const token = TOKEN_MAP[asset];
   if (!token) {
     return <p>Error</p>;
   }
@@ -504,7 +540,95 @@ function AssetCard({
 }
 
 const queryClient = new QueryClient();
+type depositModalProps = {
+  token: Token;
+  isOpen: boolean;
+  setIsOpen: (value: boolean) => void;
+  chainId: number | string | undefined;
+  address: string | undefined;
+  amount: string;
+  setAmount: (value: string) => void;
+  depositTarget: {
+    token: Token;
+    network: UpperCaseNetwork;
+    protocol: Protocol;
+  } | null;
+  handleDeposit: (
+    requiredChain: number,
+    tokenAddress: Address,
+    networkKey: EthNetwork,
+  ) => Promise<void>;
+};
 
+function DepositModal({
+  token,
+  isOpen,
+  setIsOpen,
+  chainId,
+  address,
+  amount,
+  setAmount,
+  depositTarget,
+  handleDeposit,
+}: depositModalProps) {
+  if (!chainId) return null;
+  const numericChainId =
+    typeof chainId === "string" ? Number(chainId) : chainId;
+  const networkKey = NETWORK_MAP[numericChainId];
+  if (!networkKey) return <p>Unsupported network</p>;
+
+  const tokenAddress = TOKEN_ADDRESSES[networkKey][token];
+  if (!tokenAddress) return <p>Unsupported token</p>;
+
+  const { data: balance } = useReadContract({
+    abi: erc20Abi,
+    address: tokenAddress ? (tokenAddress as Address) : undefined,
+    functionName: "balanceOf",
+    args: address ? [address as Address] : undefined,
+    query: {
+      enabled: !!address && !!tokenAddress,
+    },
+  });
+
+  console.log(
+    "chainId:",
+    chainId,
+    "networkKey:",
+    networkKey,
+    "tokenAddress:",
+    tokenAddress,
+    "address:",
+    address,
+    "balance:",
+    balance,
+  );
+
+  return (
+    <dialog open={isOpen}>
+      <p>Coin: {depositTarget?.token}</p>
+      <p>Network: {depositTarget?.network}</p>
+      <p>Protocol: {depositTarget?.protocol}</p>
+      <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
+      <input
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="0.0"
+      />
+      <button
+        onClick={async () => {
+          try {
+            await handleDeposit(numericChainId, tokenAddress, networkKey);
+            setIsOpen(false);
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      >
+        Confirm Deposit
+      </button>
+    </dialog>
+  );
+}
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -520,6 +644,7 @@ export default function App() {
       scroll,
       celo,
       plasma,
+      sepolia,
     ],
     projectId: import.meta.env.VITE_REOWN_ID!,
   });
@@ -542,6 +667,7 @@ export default function App() {
         scroll,
         celo,
         plasma,
+        sepolia,
       ]}
     >
       <WagmiProvider config={wagmiAdapter.wagmiConfig}>
@@ -573,7 +699,7 @@ function AppInner() {
     network: UpperCaseNetwork;
     protocol: Protocol;
   } | null>(null);
-  const { switchChain } = useSwitchChain();
+  // const { switchChain } = useSwitchChain();
 
   async function approve(
     tokenAddress: Address,
@@ -640,17 +766,33 @@ function AppInner() {
       return;
     }
 
-    if (chainId !== requiredChain) {
-      await switchChain({ chainId: requiredChain });
-      return; // wait for re-render
-    }
+    requiredChain;
+
+    // if (chainId !== requiredChain) {
+    //   await switchChain({ chainId: requiredChain });
+    //   return; // wait for re-render
+    // }
+
+    console.log(
+      "Address:",
+      address,
+      "Token Address:",
+      tokenAddress,
+      "Network Key:",
+      networkKey,
+      "Deposit Target:",
+      depositTarget,
+    );
 
     const decimals = TOKEN_DECIMALS[depositTarget.token];
     const parsedAmountBigInt = parseUnits(amount, decimals);
 
     try {
-      const config = PROTOCOL_CONFIG[depositTarget.protocol as EthProtocol];
+      const config =
+        PROTOCOL_CONFIG[depositTarget.protocol.toLowerCase() as EthProtocol];
       const contractAddress = config.poolAddresses[networkKey] as Address;
+
+      console.log("config:", config, "Contract Address:", contractAddress);
 
       await approve(tokenAddress, contractAddress, parsedAmountBigInt);
 
@@ -666,60 +808,6 @@ function AppInner() {
     } catch (err) {
       console.error("Deposit failed:", err);
     }
-  }
-
-  type depositModalProps = {
-    token: Token;
-    setIsOpen: (value: boolean) => void;
-  };
-
-  function DepositModal({ token, setIsOpen }: depositModalProps) {
-    if (!chainId) return null;
-
-    const numericChainId =
-      typeof chainId === "string" ? Number(chainId) : chainId;
-
-    const networkKey = NETWORK_MAP[numericChainId];
-    if (!networkKey) return <p>Unsupported network</p>;
-
-    const tokenAddress = TOKEN_ADDRESSES[networkKey][token];
-    if (!tokenAddress) return <p>Unsupported token</p>;
-
-    const { data: balance } = useReadContract({
-      abi: erc20Abi,
-      address: tokenAddress ? (tokenAddress as Address) : undefined,
-      functionName: "balanceOf",
-      args: address ? [address as Address] : undefined,
-      query: {
-        enabled: !!address && !!tokenAddress,
-      },
-    });
-
-    return (
-      <dialog open={isOpen}>
-        <p>Coin: {depositTarget?.token}</p>
-        <p>Network: {depositTarget?.network}</p>
-        <p>Protocol: {depositTarget?.protocol}</p>
-        <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
-        <input
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.0"
-        />
-        <button
-          onClick={async () => {
-            try {
-              await handleDeposit(numericChainId, tokenAddress, networkKey);
-              setIsOpen(false); // closes the modal
-            } catch (e) {
-              console.error(e);
-            }
-          }}
-        >
-          Confirm Deposit
-        </button>
-      </dialog>
-    );
   }
 
   useEffect(() => {
@@ -749,7 +837,17 @@ function AppInner() {
       <AppKitButton />
       {isConnected && <p>Wallet Connected</p>}
       {isOpen && depositTarget !== null && (
-        <DepositModal token={depositTarget.token} setIsOpen={setIsOpen} />
+        <DepositModal
+          token={depositTarget.token}
+          isOpen={isOpen}
+          setIsOpen={setIsOpen}
+          chainId={chainId}
+          address={address}
+          amount={amount}
+          setAmount={setAmount}
+          depositTarget={depositTarget}
+          handleDeposit={handleDeposit}
+        />
       )}
       <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
         {/* Header */}

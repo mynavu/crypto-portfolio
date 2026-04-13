@@ -11,6 +11,7 @@ export const PROTOCOL_CONFIG: Record<EthProtocol, config> = {
   aave: {
     poolAddresses: {
       ethereum: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+      sepolia: "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
     },
     abi: aavePoolAbi,
     type: "pool",

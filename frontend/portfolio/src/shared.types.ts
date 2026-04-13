@@ -1,5 +1,5 @@
 type Asset = "USDC" | "USDT" | "ETH" | "BTC" | "SOL";
-type Token = "usdc" | "usdt" | "btc" | "eth";
+type Token = "usdc" | "usdt" | "btc" | "eth" | "sol";
 type EthNetwork =
   | "ethereum"
   | "arbitrum"
@@ -10,7 +10,8 @@ type EthNetwork =
   | "linea"
   | "scroll"
   | "celo"
-  | "plasma";
+  | "plasma"
+  | "sepolia";
 type Network =
   | "ethereum"
   | "arbitrum"

@@ -26,6 +26,9 @@ export const TOKEN_ADDRESSES: Record<
     btc: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
     eth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
   },
+  sepolia: {
+    usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+  },
   optimism: {
     usdc: "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
     usdt: "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",

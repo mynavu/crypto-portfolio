@@ -14,7 +14,8 @@ export const aave = {
     eth: getAddress("0x49d5c2bdffac6ce2bfdb6640f4f80f226bc10bab"),
   },
   base: {
-    usdc: getAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+    // usdc: getAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+    usdc: getAddress("0x036CbD53842c5426634e7929541eC2318f3dCF7e"),
     eth: getAddress("0x4200000000000000000000000000000000000006"),
   },
   ethereum: {

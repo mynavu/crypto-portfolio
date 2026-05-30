@@ -37,6 +37,7 @@ import {
   celo,
   plasma,
   sepolia,
+  baseSepolia,
 } from "viem/chains";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -112,6 +113,7 @@ const NETWORK_MAP: Record<number, keyof typeof TOKEN_ADDRESSES> = {
   42220: "celo",
   9745: "plasma",
   11155111: "sepolia",
+  84532: "base",
 };
 
 // ─── Data Builders ────────────────────────────────────────────────────────────
@@ -659,6 +661,7 @@ export default function App() {
       celo,
       plasma,
       sepolia,
+      baseSepolia,
     ],
     projectId: import.meta.env.VITE_REOWN_ID!,
   });
@@ -682,6 +685,7 @@ export default function App() {
         celo,
         plasma,
         sepolia,
+        baseSepolia,
       ]}
     >
       <WagmiProvider config={wagmiAdapter.wagmiConfig}>

@@ -32,6 +32,29 @@ export const aavePoolAbi: Abi[] = [
     ],
     outputs: [],
   },
+  {
+    name: "repay",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "interestRateMode", type: "uint256" },
+      { name: "onBehalfOf", type: "address" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "withdraw",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "to", type: "address" },
+    ],
+    outputs: [],
+  },
 ];
 
 export const compoundAbi: Abi[] = [
@@ -56,3 +79,20 @@ export const compoundAbi: Abi[] = [
     outputs: [],
   },
 ];
+
+export const aavePoolReadAbi = [
+  {
+    name: "getUserAccountData",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      { name: "totalCollateralBase", type: "uint256" },
+      { name: "totalDebtBase", type: "uint256" },
+      { name: "availableBorrowsBase", type: "uint256" },
+      { name: "currentLiquidationThreshold", type: "uint256" },
+      { name: "ltv", type: "uint256" },
+      { name: "healthFactor", type: "uint256" },
+    ],
+  },
+] as const;

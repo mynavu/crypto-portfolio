@@ -6,13 +6,7 @@ import {
 } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
-import {
-  WagmiProvider,
-  // useSwitchChain,
-  useReadContract,
-  useWriteContract,
-  usePublicClient,
-} from "wagmi";
+import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AAVE_LINKS,
@@ -43,17 +37,25 @@ import {
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { TOKEN_ADDRESSES } from "./resources/tokenAddresses";
-import { erc20Abi, formatUnits, parseUnits } from "viem";
+import { PROTOCOL_CONFIG } from "./resources/protocolConfig";
 import {
   Asset,
   Token,
-  Address,
   Protocol,
   UpperCaseNetwork,
   EthProtocol,
   EthNetwork,
+  SuppliedAsset,
+  BorrowedAsset,
 } from "./shared.types";
-import { PROTOCOL_CONFIG } from "./resources/protocolConfig";
+import { useProtocolAdapter } from "./hooks/useProtocolAdapter";
+import { useUserPosition } from "./hooks/useUserPosition";
+import { PortfolioSummary } from "./components/PortfolioSummary";
+import { PositionPanel } from "./components/PositionPanel";
+import { SupplyModal } from "./components/SupplyModal";
+import { BorrowModal } from "./components/BorrowModal";
+import { WithdrawModal } from "./components/WithdrawModal";
+import { RepayModal } from "./components/RepayModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,17 +70,15 @@ type RateEntry = {
   link: string;
 };
 
+type ModalState =
+  | { kind: "supply"; token: Token; tokenAddress: `0x${string}`; protocol: EthProtocol; networkKey: EthNetwork; supplyApy: number | null }
+  | { kind: "borrow"; token: Token; tokenAddress: `0x${string}`; protocol: EthProtocol; networkKey: EthNetwork; borrowApy: number | null }
+  | { kind: "withdraw"; asset: SuppliedAsset; protocol: EthProtocol; networkKey: EthNetwork }
+  | { kind: "repay"; asset: BorrowedAsset; protocol: EthProtocol; networkKey: EthNetwork };
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const assets = ["USDC", "USDT", "ETH", "BTC", "SOL"] as const;
-
-const TOKEN_DECIMALS: Record<Token, number> = {
-  usdc: 6,
-  usdt: 6,
-  eth: 18,
-  btc: 8, // or 18 depending on your token
-  sol: 6,
-};
 
 const TOKEN_MAP: Partial<Record<Asset, Token>> = {
   USDC: "usdc",
@@ -115,6 +115,13 @@ const NETWORK_MAP: Record<number, keyof typeof TOKEN_ADDRESSES> = {
   9745: "plasma",
   11155111: "sepolia",
   84532: "base_sepolia",
+};
+
+// Map from Protocol display name to EthProtocol key
+const PROTOCOL_TO_ETH: Partial<Record<Protocol, EthProtocol>> = {
+  AAVE: "aave",
+  Spark: "spark",
+  COMPOUND: "compound",
 };
 
 // ─── Data Builders ────────────────────────────────────────────────────────────
@@ -238,21 +245,14 @@ function RateRow({
   entry,
   type,
   rank,
-  setIsOpen,
-  token,
-  setTransactionTarget,
+  onSupply,
+  onBorrow,
 }: {
   entry: RateEntry;
   type: "supply" | "borrow";
   rank: number;
-  setIsOpen: (value: boolean) => void;
-  token: Token;
-  setTransactionTarget: (params: {
-    token: Token;
-    network: UpperCaseNetwork;
-    protocol: Protocol;
-    type: "borrow" | "supply";
-  }) => void;
+  onSupply: () => void;
+  onBorrow: () => void;
 }) {
   const apy = type === "supply" ? entry.supplyAPY : entry.borrowAPY;
   if (apy == null) return null;
@@ -264,6 +264,7 @@ function RateRow({
   };
   const networkColor = NETWORK_COLORS[entry.network] ?? "#666";
   const isTop = rank === 0;
+  const isKamino = entry.protocol === "Kamino";
 
   const inner = (
     <div
@@ -291,17 +292,39 @@ function RateRow({
         </span>
       </div>
 
-      {/* APY value */}
-      <span
-        className={`text-sm font-black font-mono shrink-0 ${type === "supply" ? "text-emerald-400" : "text-rose-400"}`}
-      >
-        {formatted}
-      </span>
+      <div className="flex items-center gap-2 shrink-0">
+        {/* APY value */}
+        <span
+          className={`text-sm font-black font-mono ${type === "supply" ? "text-emerald-400" : "text-rose-400"}`}
+        >
+          {formatted}
+        </span>
+
+        {/* Action button — hidden for Kamino (Solana only) */}
+        {!isKamino && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (type === "supply") onSupply();
+              else onBorrow();
+            }}
+            className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
+              type === "supply"
+                ? "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                : "border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+            }`}
+          >
+            {type === "supply" ? "Supply" : "Borrow"}
+          </button>
+        )}
+      </div>
     </div>
   );
+
   return (
     <div>
-      {entry.link && (
+      {entry.link ? (
         <a
           href={entry.link}
           target="_blank"
@@ -310,46 +333,9 @@ function RateRow({
         >
           {inner}
         </a>
+      ) : (
+        <div>{inner}</div>
       )}
-      {!entry.link && <div>{inner}</div>}
-      <button
-        onClick={() => {
-          setIsOpen(true);
-          setTransactionTarget({
-            token,
-            network: entry.network,
-            protocol: entry.protocol,
-            type,
-          });
-        }}
-      >
-        {type === "supply" ? "Deposit" : "Borrow"}
-      </button>
-    </div>
-  );
-  return (
-    <div>
-      <a
-        href={entry.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block no-underline"
-      >
-        {inner}
-      </a>
-      <button
-        onClick={() => {
-          setIsOpen(true);
-          setTransactionTarget({
-            token,
-            network: entry.network,
-            protocol: entry.protocol,
-            type,
-          });
-        }}
-      >
-        {type === "supply" ? "Deposit" : "Borrow"}
-      </button>
     </div>
   );
 }
@@ -357,20 +343,13 @@ function RateRow({
 function RateList({
   entries,
   type,
-  setIsOpen,
-  token,
-  setTransactionTarget,
+  onSupply,
+  onBorrow,
 }: {
   entries: RateEntry[];
   type: "supply" | "borrow";
-  setIsOpen: (value: boolean) => void;
-  token: Token;
-  setTransactionTarget: (params: {
-    token: Token;
-    network: UpperCaseNetwork;
-    protocol: Protocol;
-    type: "borrow" | "supply";
-  }) => void;
+  onSupply: (entry: RateEntry) => void;
+  onBorrow: (entry: RateEntry) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -411,9 +390,8 @@ function RateList({
           entry={entry}
           type={type}
           rank={i}
-          setIsOpen={setIsOpen}
-          token={token}
-          setTransactionTarget={setTransactionTarget}
+          onSupply={() => onSupply(entry)}
+          onBorrow={() => onBorrow(entry)}
         />
       ))}
       {extra > 0 && (
@@ -460,22 +438,16 @@ function AssetCard({
   asset,
   entries,
   loading,
-  setIsOpen,
-  setTransactionTarget,
+  onSupply,
+  onBorrow,
 }: {
   asset: Asset;
   entries: RateEntry[];
   loading: boolean;
-  setIsOpen: (value: boolean) => void;
-  setTransactionTarget: (params: {
-    token: Token;
-    network: UpperCaseNetwork;
-    protocol: Protocol;
-    type: "borrow" | "supply";
-  }) => void;
+  onSupply: (token: Token, protocol: EthProtocol, entry: RateEntry) => void;
+  onBorrow: (token: Token, protocol: EthProtocol, entry: RateEntry) => void;
 }) {
   const accentColor = ASSET_COLORS[asset] ?? "#888";
-
   const token = TOKEN_MAP[asset];
   if (!token) {
     return <p>Error</p>;
@@ -527,18 +499,28 @@ function AssetCard({
             <RateList
               entries={entries}
               type="supply"
-              setIsOpen={setIsOpen}
-              token={token}
-              setTransactionTarget={setTransactionTarget}
+              onSupply={(entry) => {
+                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
+                if (ethProtocol) onSupply(token, ethProtocol, entry);
+              }}
+              onBorrow={(entry) => {
+                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
+                if (ethProtocol) onBorrow(token, ethProtocol, entry);
+              }}
             />
           </div>
           <div className="flex-1 p-4">
             <RateList
               entries={entries}
               type="borrow"
-              setIsOpen={setIsOpen}
-              token={token}
-              setTransactionTarget={setTransactionTarget}
+              onSupply={(entry) => {
+                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
+                if (ethProtocol) onSupply(token, ethProtocol, entry);
+              }}
+              onBorrow={(entry) => {
+                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
+                if (ethProtocol) onBorrow(token, ethProtocol, entry);
+              }}
             />
           </div>
         </div>
@@ -548,104 +530,7 @@ function AssetCard({
 }
 
 const queryClient = new QueryClient();
-type TransactionModalProps = {
-  token: Token;
-  isOpen: boolean;
-  setIsOpen: (value: boolean) => void;
-  chainId: number | string | undefined;
-  address: string | undefined;
-  amount: string;
-  setAmount: (value: string) => void;
-  transactionTarget: {
-    token: Token;
-    network: UpperCaseNetwork;
-    protocol: Protocol;
-    type: "borrow" | "supply";
-  } | null;
-  handleTransaction: (
-    requiredChain: number,
-    tokenAddress: Address,
-    networkKey: EthNetwork,
-    type: "borrow" | "supply",
-  ) => Promise<void>;
-};
 
-function TransactionModal({
-  token,
-  isOpen,
-  setIsOpen,
-  chainId,
-  address,
-  amount,
-  setAmount,
-  transactionTarget,
-  handleTransaction,
-}: TransactionModalProps) {
-  if (!chainId || !transactionTarget) return null;
-  const numericChainId =
-    typeof chainId === "string" ? Number(chainId) : chainId;
-  const networkKey = NETWORK_MAP[numericChainId];
-  if (!networkKey) return <p>Unsupported network</p>;
-
-  const tokenAddress = TOKEN_ADDRESSES[networkKey][token];
-  if (!tokenAddress) return <p>Unsupported token</p>;
-
-  const { data: balance } = useReadContract({
-    abi: erc20Abi,
-    address: tokenAddress ? (tokenAddress as Address) : undefined,
-    functionName: "balanceOf",
-    args: address ? [address as Address] : undefined,
-    query: {
-      enabled: !!address && !!tokenAddress,
-    },
-  });
-
-  // console.log(
-  //   "chainId:",
-  //   chainId,
-  //   "networkKey:",
-  //   networkKey,
-  //   "tokenAddress:",
-  //   tokenAddress,
-  //   "address:",
-  //   address,
-  //   "balance:",
-  //   balance,
-  // );
-
-  return (
-    <dialog open={isOpen}>
-      <p>Coin: {transactionTarget?.token}</p>
-      <p>Network: {transactionTarget?.network}</p>
-      <p>Protocol: {transactionTarget?.protocol}</p>
-      <p>Balance: {balance ? formatUnits(balance, 6) : "0"}</p>
-      <input
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder="0.0"
-      />
-      <button
-        onClick={async () => {
-          try {
-            await handleTransaction(
-              numericChainId,
-              tokenAddress,
-              networkKey,
-              transactionTarget.type,
-            );
-            setIsOpen(false);
-          } catch (e) {
-            console.error(e);
-          }
-        }}
-      >
-        {transactionTarget.type === "supply"
-          ? "Confirm Deposit"
-          : "Confirm Borrow"}
-      </button>
-    </dialog>
-  );
-}
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -700,183 +585,32 @@ export default function App() {
 
 function AppInner() {
   const { address, isConnected } = useAppKitAccount();
-  const [amount, setAmount] = useState("");
   const { chainId } = useAppKitNetwork();
-  const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient();
   const [aaveFlat, setAaveFlat] = useState<AaveApyFlat | null>(null);
-  const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(
-    null,
-  );
-  const [kaminoAPY, setKaminoAPY] = useState<Record<string, number> | null>(
-    null,
-  );
+  const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(null);
+  const [kaminoAPY, setKaminoAPY] = useState<Record<string, number> | null>(null);
   const [sparkAPY, setSparkAPY] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isOpen, setIsOpen] = useState(false);
-  const [transactionTarget, setTransactionTarget] = useState<{
-    token: Token;
-    network: UpperCaseNetwork;
-    protocol: Protocol;
-    type: "borrow" | "supply";
-  } | null>(null);
-  // const { switchChain } = useSwitchChain();
+  const [modal, setModal] = useState<ModalState | null>(null);
 
-  async function approve(
-    tokenAddress: Address,
-    poolAddress: Address,
-    amount: bigint,
-  ) {
-    const hash = await writeContractAsync({
-      address: tokenAddress,
-      abi: erc20Abi,
-      functionName: "approve",
-      args: [poolAddress, amount],
-    });
-    await publicClient?.waitForTransactionReceipt({ hash });
-  }
+  const numericChainId = chainId
+    ? typeof chainId === "string" ? Number(chainId) : chainId
+    : undefined;
+  const networkKey: EthNetwork | null = numericChainId
+    ? (NETWORK_MAP[numericChainId] as EthNetwork) ?? null
+    : null;
 
-  async function borrow({
-    protocol,
+  const aavePoolAddress = networkKey
+    ? (PROTOCOL_CONFIG.aave.poolAddresses[networkKey] ?? undefined)
+    : undefined;
+
+  const { accountData, supplied, borrowed, isLoading: positionLoading } = useUserPosition(
+    aavePoolAddress,
+    address,
     networkKey,
-    tokenAddress,
-    amount,
-  }: {
-    protocol: EthProtocol;
-    networkKey: EthNetwork;
-    tokenAddress: Address;
-    amount: bigint;
-  }) {
-    const config = PROTOCOL_CONFIG[protocol.toLowerCase() as EthProtocol];
-    const contractAddress = config.poolAddresses[networkKey];
+  );
 
-    if (!contractAddress) throw new Error("Unsupported network");
-
-    if (protocol === "compound") {
-      await writeContractAsync({
-        address: contractAddress,
-        abi: config.abi,
-        functionName: "withdraw",
-        args: [tokenAddress, amount],
-      });
-    } else {
-      // Aave + Spark — 2 = variable rate, almost always what you want
-      await writeContractAsync({
-        address: contractAddress,
-        abi: config.abi,
-        functionName: "borrow",
-        args: [tokenAddress, amount, 2, 0, address],
-      });
-    }
-  }
-
-  async function deposit({
-    protocol,
-    networkKey,
-    tokenAddress,
-    amount,
-    userAddress,
-  }: {
-    protocol: EthProtocol;
-    networkKey: EthNetwork;
-    tokenAddress: Address;
-    amount: bigint;
-    userAddress: Address;
-  }) {
-    const config = PROTOCOL_CONFIG[protocol.toLowerCase() as EthProtocol];
-    const contractAddress = config.poolAddresses[networkKey];
-
-    if (!contractAddress) throw new Error("Unsupported network");
-
-    if (protocol === "compound") {
-      // Compound
-      await writeContractAsync({
-        address: contractAddress,
-        abi: config.abi,
-        functionName: "supply",
-        args: [tokenAddress, amount],
-      });
-    } else {
-      // Aave + Spark
-      await writeContractAsync({
-        address: contractAddress,
-        abi: config.abi,
-        functionName: "supply",
-        args: [tokenAddress, amount, userAddress, 0],
-      });
-    }
-  }
-
-  async function handleTransaction(
-    requiredChain: any,
-    tokenAddress: Address,
-    networkKey: EthNetwork,
-    type: "borrow" | "supply",
-  ) {
-    if (!address || !tokenAddress || !networkKey || transactionTarget === null)
-      return;
-    if (
-      transactionTarget.protocol === "COMPOUND" &&
-      transactionTarget.token !== "usdc"
-    ) {
-      console.error("Compound only supports USDC on Ethereum");
-      return;
-    }
-
-    requiredChain;
-
-    // if (chainId !== requiredChain) {
-    //   await switchChain({ chainId: requiredChain });
-    //   return; // wait for re-render
-    // }
-
-    console.log(
-      "Address:",
-      address,
-      "Token Address:",
-      tokenAddress,
-      "Network Key:",
-      networkKey,
-      "Deposit Target:",
-      transactionTarget,
-    );
-
-    const decimals = TOKEN_DECIMALS[transactionTarget.token];
-    const parsedAmountBigInt = parseUnits(amount, decimals);
-
-    try {
-      const config =
-        PROTOCOL_CONFIG[
-          transactionTarget.protocol.toLowerCase() as EthProtocol
-        ];
-      const contractAddress = config.poolAddresses[networkKey] as Address;
-
-      console.log("config:", config, "Contract Address:", contractAddress);
-
-      await approve(tokenAddress, contractAddress, parsedAmountBigInt);
-
-      if (type === "supply") {
-        await deposit({
-          protocol: transactionTarget.protocol as EthProtocol,
-          networkKey,
-          tokenAddress,
-          amount: parsedAmountBigInt,
-          userAddress: address as Address,
-        });
-      } else {
-        await borrow({
-          protocol: transactionTarget.protocol as EthProtocol,
-          networkKey,
-          tokenAddress,
-          amount: parsedAmountBigInt,
-        });
-      }
-
-      console.log("Transaction successful");
-    } catch (err) {
-      console.error("Transaction failed:", err);
-    }
-  }
+  const adapter = useProtocolAdapter(modal?.protocol ?? null);
 
   useEffect(() => {
     const getYield = async () => {
@@ -900,23 +634,36 @@ function AppInner() {
     getYield();
   }, []);
 
+  function handleSupply(token: Token, protocol: EthProtocol, entry: RateEntry) {
+    if (!networkKey) return;
+    const tokenAddress = TOKEN_ADDRESSES[networkKey]?.[token];
+    if (!tokenAddress) return;
+    setModal({ kind: "supply", token, tokenAddress, protocol, networkKey, supplyApy: entry.supplyAPY });
+  }
+
+  function handleBorrow(token: Token, protocol: EthProtocol, entry: RateEntry) {
+    if (!networkKey) return;
+    const tokenAddress = TOKEN_ADDRESSES[networkKey]?.[token];
+    if (!tokenAddress) return;
+    setModal({ kind: "borrow", token, tokenAddress, protocol, networkKey, borrowApy: entry.borrowAPY });
+  }
+
+  function handleWithdraw(asset: SuppliedAsset) {
+    if (!networkKey) return;
+    setModal({ kind: "withdraw", asset, protocol: "aave", networkKey });
+  }
+
+  function handleRepay(asset: BorrowedAsset) {
+    if (!networkKey) return;
+    setModal({ kind: "repay", asset, protocol: "aave", networkKey });
+  }
+
+  const showPositionPanel = isConnected && (supplied.length > 0 || borrowed.length > 0);
+
   return (
     <>
       <AppKitButton />
-      {isConnected && <p>Wallet Connected</p>}
-      {isOpen && transactionTarget !== null && (
-        <TransactionModal
-          token={transactionTarget.token}
-          isOpen={isOpen}
-          setIsOpen={setIsOpen}
-          chainId={chainId}
-          address={address}
-          amount={amount}
-          setAmount={setAmount}
-          transactionTarget={transactionTarget}
-          handleTransaction={handleTransaction}
-        />
-      )}
+
       <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
         {/* Header */}
         <div className="max-w-2xl mx-auto mb-12">
@@ -932,8 +679,24 @@ function AppInner() {
           </p>
         </div>
 
-        {/* Cards — vertical stack */}
         <div className="max-w-2xl mx-auto flex flex-col gap-4">
+          {/* Portfolio summary */}
+          {isConnected && (
+            <PortfolioSummary accountData={accountData} isLoading={positionLoading} />
+          )}
+
+          {/* Position panel */}
+          {showPositionPanel && (
+            <PositionPanel
+              supplied={supplied}
+              borrowed={borrowed}
+              onWithdraw={handleWithdraw}
+              onRepay={handleRepay}
+              isConnected={isConnected}
+            />
+          )}
+
+          {/* Rate cards */}
           {assets.map((asset) => (
             <AssetCard
               key={asset}
@@ -946,8 +709,8 @@ function AppInner() {
                 kaminoAPY,
                 sparkAPY,
               )}
-              setIsOpen={setIsOpen}
-              setTransactionTarget={setTransactionTarget}
+              onSupply={handleSupply}
+              onBorrow={handleBorrow}
             />
           ))}
         </div>
@@ -958,6 +721,59 @@ function AppInner() {
           best rate
         </p>
       </div>
+
+      {/* Modals */}
+      {modal?.kind === "supply" && adapter && address && (
+        <SupplyModal
+          token={modal.token}
+          tokenAddress={modal.tokenAddress}
+          networkKey={modal.networkKey}
+          adapter={adapter}
+          userAddress={address as `0x${string}`}
+          supplyApy={modal.supplyApy}
+          onClose={() => setModal(null)}
+          onSuccess={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === "borrow" && adapter && address && (
+        <BorrowModal
+          token={modal.token}
+          tokenAddress={modal.tokenAddress}
+          networkKey={modal.networkKey}
+          adapter={adapter}
+          userAddress={address as `0x${string}`}
+          borrowApy={modal.borrowApy}
+          accountData={accountData}
+          onClose={() => setModal(null)}
+          onSuccess={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === "withdraw" && adapter && address && (
+        <WithdrawModal
+          token={modal.asset.token}
+          tokenAddress={modal.asset.tokenAddress}
+          networkKey={modal.networkKey}
+          adapter={adapter}
+          userAddress={address as `0x${string}`}
+          suppliedBalance={modal.asset.balance}
+          decimals={modal.asset.decimals}
+          onClose={() => setModal(null)}
+          onSuccess={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === "repay" && adapter && address && (
+        <RepayModal
+          token={modal.asset.token}
+          tokenAddress={modal.asset.tokenAddress}
+          networkKey={modal.networkKey}
+          adapter={adapter}
+          userAddress={address as `0x${string}`}
+          debt={modal.asset.debt}
+          decimals={modal.asset.decimals}
+          onClose={() => setModal(null)}
+          onSuccess={() => setModal(null)}
+        />
+      )}
     </>
   );
 }

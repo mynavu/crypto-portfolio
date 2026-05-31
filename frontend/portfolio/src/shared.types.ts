@@ -42,6 +42,31 @@ type EthProtocol = "aave" | "spark" | "compound";
 type Address = `0x${string}`;
 type Protocol = "AAVE" | "COMPOUND" | "Kamino" | "Spark";
 
+export type UserAccountData = {
+  totalCollateralUsd: number;
+  totalDebtUsd: number;
+  availableBorrowsUsd: number;
+  currentLiquidationThreshold: number;
+  ltv: number;
+  healthFactor: number | null; // null = infinite (no debt)
+};
+
+export type SuppliedAsset = {
+  token: string;
+  tokenAddress: Address;
+  aTokenAddress: Address;
+  balance: bigint;
+  decimals: number;
+};
+
+export type BorrowedAsset = {
+  token: string;
+  tokenAddress: Address;
+  debtTokenAddress: Address;
+  debt: bigint;
+  decimals: number;
+};
+
 export type {
   Asset,
   Token,

@@ -22,6 +22,8 @@ export const TOKEN_ADDRESSES: Record<
   },
   base_sepolia: {
     usdc: "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+    usdt: "0x0a215D8ba66387DCA84B284D18c3B4ec3de6E54a",
+    eth: "0x4200000000000000000000000000000000000006",
   },
   ethereum: {
     usdc: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",

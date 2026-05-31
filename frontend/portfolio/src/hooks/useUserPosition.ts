@@ -27,7 +27,7 @@ export function useUserPosition(
   networkKey: EthNetwork | null,
 ) {
   // Phase 1: getUserAccountData
-  const { data: accountRaw, isLoading: accountLoading } = useReadContract({
+  const { data: accountRaw, isLoading: accountLoading, refetch: refetchAccount } = useReadContract({
     abi: aavePoolReadAbi,
     address: poolAddress,
     functionName: "getUserAccountData",
@@ -59,7 +59,7 @@ export function useUserPosition(
     },
   ]);
 
-  const { data: balancesRaw, isLoading: balancesLoading } = useReadContracts({
+  const { data: balancesRaw, isLoading: balancesLoading, refetch: refetchBalances } = useReadContracts({
     contracts: balanceContracts,
     query: {
       enabled: !!userAddress && reserveEntries.length > 0,
@@ -134,10 +134,16 @@ export function useUserPosition(
     });
   }
 
+  function refetch() {
+    refetchAccount();
+    refetchBalances();
+  }
+
   return {
     accountData,
     supplied,
     borrowed,
     isLoading: accountLoading || balancesLoading,
+    refetch,
   };
 }

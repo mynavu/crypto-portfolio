@@ -6,7 +6,7 @@ import {
 } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider, useSwitchChain } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AAVE_LINKS,
@@ -51,7 +51,6 @@ import {
 import { useProtocolAdapter } from "./hooks/useProtocolAdapter";
 import { useUserPosition } from "./hooks/useUserPosition";
 import { PortfolioSummary } from "./components/PortfolioSummary";
-import { PositionPanel } from "./components/PositionPanel";
 import { SupplyModal } from "./components/SupplyModal";
 import { BorrowModal } from "./components/BorrowModal";
 import { WithdrawModal } from "./components/WithdrawModal";
@@ -115,6 +114,34 @@ const NETWORK_MAP: Record<number, keyof typeof TOKEN_ADDRESSES> = {
   9745: "plasma",
   11155111: "sepolia",
   84532: "base_sepolia",
+};
+
+const UPPER_NETWORK_TO_ETH: Partial<Record<UpperCaseNetwork, EthNetwork>> = {
+  Ethereum: "ethereum",
+  Arbitrum: "arbitrum",
+  Optimism: "optimism",
+  Base: "base",
+  Polygon: "polygon",
+  Avalanche: "avalanche",
+  Linea: "linea",
+  Scroll: "scroll",
+  Celo: "celo",
+  Plasma: "plasma",
+};
+
+const ETH_NETWORK_CHAIN_IDS: Partial<Record<EthNetwork, number>> = {
+  ethereum: 1,
+  arbitrum: 42161,
+  optimism: 10,
+  base: 8453,
+  base_sepolia: 84532,
+  polygon: 137,
+  avalanche: 43114,
+  linea: 59144,
+  scroll: 534352,
+  celo: 42220,
+  plasma: 9745,
+  sepolia: 11155111,
 };
 
 // Map from Protocol display name to EthProtocol key
@@ -604,13 +631,14 @@ function AppInner() {
     ? (PROTOCOL_CONFIG.aave.poolAddresses[networkKey] ?? undefined)
     : undefined;
 
-  const { accountData, supplied, borrowed, isLoading: positionLoading } = useUserPosition(
+  const { accountData, supplied, borrowed, isLoading: positionLoading, refetch: refetchPosition } = useUserPosition(
     aavePoolAddress,
     address,
     networkKey,
   );
 
   const adapter = useProtocolAdapter(modal?.protocol ?? null);
+  const { switchChainAsync } = useSwitchChain();
 
   useEffect(() => {
     const getYield = async () => {
@@ -634,18 +662,34 @@ function AppInner() {
     getYield();
   }, []);
 
-  function handleSupply(token: Token, protocol: EthProtocol, entry: RateEntry) {
-    if (!networkKey) return;
-    const tokenAddress = TOKEN_ADDRESSES[networkKey]?.[token];
-    if (!tokenAddress) return;
-    setModal({ kind: "supply", token, tokenAddress, protocol, networkKey, supplyApy: entry.supplyAPY });
+  async function switchToNetwork(targetKey: EthNetwork): Promise<boolean> {
+    const targetChainId = ETH_NETWORK_CHAIN_IDS[targetKey];
+    if (!targetChainId) return false;
+    if (numericChainId === targetChainId) return true;
+    try {
+      await switchChainAsync({ chainId: targetChainId });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  function handleBorrow(token: Token, protocol: EthProtocol, entry: RateEntry) {
-    if (!networkKey) return;
-    const tokenAddress = TOKEN_ADDRESSES[networkKey]?.[token];
+  async function handleSupply(token: Token, protocol: EthProtocol, entry: RateEntry) {
+    const targetKey = UPPER_NETWORK_TO_ETH[entry.network];
+    if (!targetKey) return;
+    const tokenAddress = TOKEN_ADDRESSES[targetKey]?.[token];
     if (!tokenAddress) return;
-    setModal({ kind: "borrow", token, tokenAddress, protocol, networkKey, borrowApy: entry.borrowAPY });
+    if (!(await switchToNetwork(targetKey))) return;
+    setModal({ kind: "supply", token, tokenAddress, protocol, networkKey: targetKey, supplyApy: entry.supplyAPY });
+  }
+
+  async function handleBorrow(token: Token, protocol: EthProtocol, entry: RateEntry) {
+    const targetKey = UPPER_NETWORK_TO_ETH[entry.network];
+    if (!targetKey) return;
+    const tokenAddress = TOKEN_ADDRESSES[targetKey]?.[token];
+    if (!tokenAddress) return;
+    if (!(await switchToNetwork(targetKey))) return;
+    setModal({ kind: "borrow", token, tokenAddress, protocol, networkKey: targetKey, borrowApy: entry.borrowAPY });
   }
 
   function handleWithdraw(asset: SuppliedAsset) {
@@ -657,8 +701,6 @@ function AppInner() {
     if (!networkKey) return;
     setModal({ kind: "repay", asset, protocol: "aave", networkKey });
   }
-
-  const showPositionPanel = isConnected && (supplied.length > 0 || borrowed.length > 0);
 
   return (
     <>
@@ -680,19 +722,15 @@ function AppInner() {
         </div>
 
         <div className="max-w-2xl mx-auto flex flex-col gap-4">
-          {/* Portfolio summary */}
+          {/* Portfolio summary (with expandable supplied/borrowed sections) */}
           {isConnected && (
-            <PortfolioSummary accountData={accountData} isLoading={positionLoading} />
-          )}
-
-          {/* Position panel */}
-          {showPositionPanel && (
-            <PositionPanel
+            <PortfolioSummary
+              accountData={accountData}
+              isLoading={positionLoading}
               supplied={supplied}
               borrowed={borrowed}
               onWithdraw={handleWithdraw}
               onRepay={handleRepay}
-              isConnected={isConnected}
             />
           )}
 
@@ -732,7 +770,7 @@ function AppInner() {
           userAddress={address as `0x${string}`}
           supplyApy={modal.supplyApy}
           onClose={() => setModal(null)}
-          onSuccess={() => setModal(null)}
+          onSuccess={() => { setModal(null); refetchPosition(); }}
         />
       )}
       {modal?.kind === "borrow" && adapter && address && (
@@ -745,7 +783,7 @@ function AppInner() {
           borrowApy={modal.borrowApy}
           accountData={accountData}
           onClose={() => setModal(null)}
-          onSuccess={() => setModal(null)}
+          onSuccess={() => { setModal(null); refetchPosition(); }}
         />
       )}
       {modal?.kind === "withdraw" && adapter && address && (
@@ -758,7 +796,7 @@ function AppInner() {
           suppliedBalance={modal.asset.balance}
           decimals={modal.asset.decimals}
           onClose={() => setModal(null)}
-          onSuccess={() => setModal(null)}
+          onSuccess={() => { setModal(null); refetchPosition(); }}
         />
       )}
       {modal?.kind === "repay" && adapter && address && (
@@ -771,7 +809,7 @@ function AppInner() {
           debt={modal.asset.debt}
           decimals={modal.asset.decimals}
           onClose={() => setModal(null)}
-          onSuccess={() => setModal(null)}
+          onSuccess={() => { setModal(null); refetchPosition(); }}
         />
       )}
     </>

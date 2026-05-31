@@ -36,7 +36,8 @@ type UpperCaseNetwork =
   | "Scroll"
   | "Celo"
   | "Plasma"
-  | "Solana";
+  | "Solana"
+  | "Base Sepolia";
 
 type EthProtocol = "aave" | "spark" | "compound";
 type Address = `0x${string}`;

@@ -3,6 +3,7 @@ import {
   useAppKitAccount,
   useAppKitNetwork,
   AppKitButton,
+  useAppKit,
 } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
@@ -70,10 +71,34 @@ type RateEntry = {
 };
 
 type ModalState =
-  | { kind: "supply"; token: Token; tokenAddress: `0x${string}`; protocol: EthProtocol; networkKey: EthNetwork; supplyApy: number | null }
-  | { kind: "borrow"; token: Token; tokenAddress: `0x${string}`; protocol: EthProtocol; networkKey: EthNetwork; borrowApy: number | null }
-  | { kind: "withdraw"; asset: SuppliedAsset; protocol: EthProtocol; networkKey: EthNetwork }
-  | { kind: "repay"; asset: BorrowedAsset; protocol: EthProtocol; networkKey: EthNetwork };
+  | {
+      kind: "supply";
+      token: Token;
+      tokenAddress: `0x${string}`;
+      protocol: EthProtocol;
+      networkKey: EthNetwork;
+      supplyApy: number | null;
+    }
+  | {
+      kind: "borrow";
+      token: Token;
+      tokenAddress: `0x${string}`;
+      protocol: EthProtocol;
+      networkKey: EthNetwork;
+      borrowApy: number | null;
+    }
+  | {
+      kind: "withdraw";
+      asset: SuppliedAsset;
+      protocol: EthProtocol;
+      networkKey: EthNetwork;
+    }
+  | {
+      kind: "repay";
+      asset: BorrowedAsset;
+      protocol: EthProtocol;
+      networkKey: EthNetwork;
+    };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -127,6 +152,7 @@ const UPPER_NETWORK_TO_ETH: Partial<Record<UpperCaseNetwork, EthNetwork>> = {
   Scroll: "scroll",
   Celo: "celo",
   Plasma: "plasma",
+  "Base Sepolia": "base_sepolia",
 };
 
 const ETH_NETWORK_CHAIN_IDS: Partial<Record<EthNetwork, number>> = {
@@ -219,6 +245,26 @@ function buildSingleNetworkEntries(
   ];
 }
 
+const BASE_SEPOLIA_AAVE_LINKS: Partial<Record<Asset, string>> = {
+  USDC: "https://app.aave.com/reserve-overview/?underlyingAsset=0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f&marketName=proto_base_sepolia_v3",
+  USDT: "https://app.aave.com/reserve-overview/?underlyingAsset=0x0a215d8ba66387dca84b284d18c3b4ec3de6e54a&marketName=proto_base_sepolia_v3",
+  ETH: "https://app.aave.com/reserve-overview/?underlyingAsset=0x4200000000000000000000000000000000000006&marketName=proto_base_sepolia_v3",
+};
+
+function buildBaseSepolia(asset: Asset): RateEntry[] {
+  const link = BASE_SEPOLIA_AAVE_LINKS[asset];
+  if (!link) return [];
+  return [
+    {
+      protocol: "AAVE",
+      network: "Base Sepolia",
+      supplyAPY: null,
+      borrowAPY: null,
+      link,
+    },
+  ];
+}
+
 function buildAllEntries(
   asset: Asset,
   aaveFlat: AaveApyFlat | null,
@@ -244,6 +290,7 @@ function buildAllEntries(
   };
   return [
     ...(aaveFlat ? buildAaveEntries(aaveFlat, asset) : []),
+    ...buildBaseSepolia(asset),
     ...(compoundFlat ? buildCompoundEntries(compoundFlat, asset) : []),
     ...buildSingleNetworkEntries(
       kaminoAPY,
@@ -282,15 +329,13 @@ function RateRow({
   onBorrow: () => void;
 }) {
   const apy = type === "supply" ? entry.supplyAPY : entry.borrowAPY;
-  if (apy == null) return null;
-
-  const formatted = (apy * 100).toFixed(2) + "%";
+  const formatted = apy != null ? (apy * 100).toFixed(2) + "%" : null;
   const style = PROTOCOL_COLORS[entry.protocol] ?? {
     color: "#888",
     bg: "transparent",
   };
   const networkColor = NETWORK_COLORS[entry.network] ?? "#666";
-  const isTop = rank === 0;
+  const isTop = apy != null && rank === 0;
   const isKamino = entry.protocol === "Kamino";
 
   const inner = (
@@ -300,9 +345,9 @@ function RateRow({
       <div className="flex items-center gap-2 min-w-0">
         {/* Rank */}
         <span
-          className={`text-[10px] font-black font-mono w-4 shrink-0 ${rank === 0 ? "text-yellow-400" : rank === 1 ? "text-zinc-500" : "text-zinc-700"}`}
+          className={`text-[10px] font-black font-mono w-4 shrink-0 ${apy != null && rank === 0 ? "text-yellow-400" : apy != null && rank === 1 ? "text-zinc-500" : "text-zinc-700"}`}
         >
-          #{rank + 1}
+          {apy != null ? `#${rank + 1}` : "—"}
         </span>
 
         {/* Protocol badge */}
@@ -322,9 +367,9 @@ function RateRow({
       <div className="flex items-center gap-2 shrink-0">
         {/* APY value */}
         <span
-          className={`text-sm font-black font-mono ${type === "supply" ? "text-emerald-400" : "text-rose-400"}`}
+          className={`text-sm font-black font-mono ${formatted != null ? (type === "supply" ? "text-emerald-400" : "text-rose-400") : "text-zinc-600"}`}
         >
-          {formatted}
+          {formatted ?? "—"}
         </span>
 
         {/* Action button — hidden for Kamino (Solana only) */}
@@ -336,7 +381,7 @@ function RateRow({
               if (type === "supply") onSupply();
               else onBorrow();
             }}
-            className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
+            className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
               type === "supply"
                 ? "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
                 : "border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
@@ -370,28 +415,30 @@ function RateRow({
 function RateList({
   entries,
   type,
+  expanded,
   onSupply,
   onBorrow,
 }: {
   entries: RateEntry[];
   type: "supply" | "borrow";
+  expanded: boolean;
   onSupply: (entry: RateEntry) => void;
   onBorrow: (entry: RateEntry) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const valid = [...entries]
+  const withApy = [...entries]
     .filter((e) => (type === "supply" ? e.supplyAPY : e.borrowAPY) != null)
     .sort((a, b) => {
       const av = type === "supply" ? a.supplyAPY! : a.borrowAPY!;
       const bv = type === "supply" ? b.supplyAPY! : b.borrowAPY!;
       return type === "supply" ? bv - av : av - bv;
     });
+  const withoutApy = entries.filter(
+    (e) => (type === "supply" ? e.supplyAPY : e.borrowAPY) == null,
+  );
+  const all = [...withApy, ...withoutApy];
+  const visible = expanded ? all : all.slice(0, VISIBLE_COUNT);
 
-  const visible = expanded ? valid : valid.slice(0, VISIBLE_COUNT);
-  const extra = valid.length - VISIBLE_COUNT;
-
-  if (!valid.length) {
+  if (!all.length) {
     return (
       <div className="flex flex-col gap-1">
         <p
@@ -421,14 +468,6 @@ function RateList({
           onBorrow={() => onBorrow(entry)}
         />
       ))}
-      {extra > 0 && (
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="text-left text-[10px] font-semibold tracking-widest uppercase px-3 py-1.5 text-zinc-600 hover:text-zinc-400 transition-colors"
-        >
-          {expanded ? "↑ less" : `+ ${extra} more`}
-        </button>
-      )}
     </div>
   );
 }
@@ -474,11 +513,31 @@ function AssetCard({
   onSupply: (token: Token, protocol: EthProtocol, entry: RateEntry) => void;
   onBorrow: (token: Token, protocol: EthProtocol, entry: RateEntry) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const accentColor = ASSET_COLORS[asset] ?? "#888";
   const token = TOKEN_MAP[asset];
-  if (!token) {
-    return <p>Error</p>;
-  }
+  if (!token) return <p>Error</p>;
+
+  const supplyCount =
+    entries.filter((e) => e.supplyAPY != null).length +
+    entries.filter((e) => e.supplyAPY == null && e.protocol !== "Kamino")
+      .length;
+  const borrowCount =
+    entries.filter((e) => e.borrowAPY != null).length +
+    entries.filter((e) => e.borrowAPY == null && e.protocol !== "Kamino")
+      .length;
+  const hasMore = Math.max(supplyCount, borrowCount) > VISIBLE_COUNT;
+
+  const listHandlers = {
+    onSupply: (e: RateEntry) => {
+      const p = PROTOCOL_TO_ETH[e.protocol];
+      if (p) onSupply(token, p, e);
+    },
+    onBorrow: (e: RateEntry) => {
+      const p = PROTOCOL_TO_ETH[e.protocol];
+      if (p) onBorrow(token, p, e);
+    },
+  };
 
   return (
     <div className="bg-[#0a0a0a] border border-[#181818] rounded-2xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.8)]">
@@ -502,7 +561,6 @@ function AssetCard({
         <span className="text-sm font-black tracking-widest text-zinc-200 font-mono">
           {asset}
         </span>
-
         {!loading && (
           <div className="ml-auto flex gap-3 text-[10px] text-zinc-600 font-mono">
             <span>
@@ -521,36 +579,34 @@ function AssetCard({
       {loading ? (
         <LoadingCard />
       ) : (
-        <div className="flex gap-0 divide-x divide-[#141414]">
-          <div className="flex-1 p-4">
-            <RateList
-              entries={entries}
-              type="supply"
-              onSupply={(entry) => {
-                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
-                if (ethProtocol) onSupply(token, ethProtocol, entry);
-              }}
-              onBorrow={(entry) => {
-                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
-                if (ethProtocol) onBorrow(token, ethProtocol, entry);
-              }}
-            />
+        <>
+          <div className="flex gap-0 divide-x divide-[#141414]">
+            <div className="flex-1 p-4">
+              <RateList
+                entries={entries}
+                type="supply"
+                expanded={expanded}
+                {...listHandlers}
+              />
+            </div>
+            <div className="flex-1 p-4">
+              <RateList
+                entries={entries}
+                type="borrow"
+                expanded={expanded}
+                {...listHandlers}
+              />
+            </div>
           </div>
-          <div className="flex-1 p-4">
-            <RateList
-              entries={entries}
-              type="borrow"
-              onSupply={(entry) => {
-                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
-                if (ethProtocol) onSupply(token, ethProtocol, entry);
-              }}
-              onBorrow={(entry) => {
-                const ethProtocol = PROTOCOL_TO_ETH[entry.protocol];
-                if (ethProtocol) onBorrow(token, ethProtocol, entry);
-              }}
-            />
-          </div>
-        </div>
+          {hasMore && (
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              className="w-full text-center text-[10px] font-semibold tracking-widest uppercase px-3 py-2 border-t border-[#141414] text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              {expanded ? "↑ show less" : "↓ show more"}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -610,32 +666,54 @@ export default function App() {
   );
 }
 
+function WalletButton() {
+  const { isConnected } = useAppKitAccount();
+  const { open } = useAppKit();
+  if (isConnected) return <AppKitButton />;
+  return (
+    <button
+      onClick={() => open()}
+      className="text-xs font-mono font-semibold px-4 py-2 rounded-xl bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-200 transition-colors cursor-pointer"
+    >
+      Connect Wallet
+    </button>
+  );
+}
+
 function AppInner() {
   const { address, isConnected } = useAppKitAccount();
   const { chainId } = useAppKitNetwork();
   const [aaveFlat, setAaveFlat] = useState<AaveApyFlat | null>(null);
-  const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(null);
-  const [kaminoAPY, setKaminoAPY] = useState<Record<string, number> | null>(null);
+  const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(
+    null,
+  );
+  const [kaminoAPY, setKaminoAPY] = useState<Record<string, number> | null>(
+    null,
+  );
   const [sparkAPY, setSparkAPY] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState | null>(null);
 
   const numericChainId = chainId
-    ? typeof chainId === "string" ? Number(chainId) : chainId
+    ? typeof chainId === "string"
+      ? Number(chainId)
+      : chainId
     : undefined;
   const networkKey: EthNetwork | null = numericChainId
-    ? (NETWORK_MAP[numericChainId] as EthNetwork) ?? null
+    ? ((NETWORK_MAP[numericChainId] as EthNetwork) ?? null)
     : null;
 
   const aavePoolAddress = networkKey
     ? (PROTOCOL_CONFIG.aave.poolAddresses[networkKey] ?? undefined)
     : undefined;
 
-  const { accountData, supplied, borrowed, isLoading: positionLoading, refetch: refetchPosition } = useUserPosition(
-    aavePoolAddress,
-    address,
-    networkKey,
-  );
+  const {
+    accountData,
+    supplied,
+    borrowed,
+    isLoading: positionLoading,
+    refetch: refetchPosition,
+  } = useUserPosition(aavePoolAddress, address, networkKey);
 
   const adapter = useProtocolAdapter(modal?.protocol ?? null);
   const { switchChainAsync } = useSwitchChain();
@@ -674,22 +752,44 @@ function AppInner() {
     }
   }
 
-  async function handleSupply(token: Token, protocol: EthProtocol, entry: RateEntry) {
+  async function handleSupply(
+    token: Token,
+    protocol: EthProtocol,
+    entry: RateEntry,
+  ) {
     const targetKey = UPPER_NETWORK_TO_ETH[entry.network];
     if (!targetKey) return;
     const tokenAddress = TOKEN_ADDRESSES[targetKey]?.[token];
     if (!tokenAddress) return;
     if (!(await switchToNetwork(targetKey))) return;
-    setModal({ kind: "supply", token, tokenAddress, protocol, networkKey: targetKey, supplyApy: entry.supplyAPY });
+    setModal({
+      kind: "supply",
+      token,
+      tokenAddress,
+      protocol,
+      networkKey: targetKey,
+      supplyApy: entry.supplyAPY,
+    });
   }
 
-  async function handleBorrow(token: Token, protocol: EthProtocol, entry: RateEntry) {
+  async function handleBorrow(
+    token: Token,
+    protocol: EthProtocol,
+    entry: RateEntry,
+  ) {
     const targetKey = UPPER_NETWORK_TO_ETH[entry.network];
     if (!targetKey) return;
     const tokenAddress = TOKEN_ADDRESSES[targetKey]?.[token];
     if (!tokenAddress) return;
     if (!(await switchToNetwork(targetKey))) return;
-    setModal({ kind: "borrow", token, tokenAddress, protocol, networkKey: targetKey, borrowApy: entry.borrowAPY });
+    setModal({
+      kind: "borrow",
+      token,
+      tokenAddress,
+      protocol,
+      networkKey: targetKey,
+      borrowApy: entry.borrowAPY,
+    });
   }
 
   function handleWithdraw(asset: SuppliedAsset) {
@@ -704,7 +804,9 @@ function AppInner() {
 
   return (
     <>
-      <AppKitButton />
+      <div className="fixed bottom-6 left-6 z-50">
+        <WalletButton />
+      </div>
 
       <div className="min-h-screen bg-[#050505] text-zinc-100 py-16 px-6">
         {/* Header */}
@@ -770,7 +872,10 @@ function AppInner() {
           userAddress={address as `0x${string}`}
           supplyApy={modal.supplyApy}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); refetchPosition(); }}
+          onSuccess={() => {
+            setModal(null);
+            refetchPosition();
+          }}
         />
       )}
       {modal?.kind === "borrow" && adapter && address && (
@@ -783,7 +888,10 @@ function AppInner() {
           borrowApy={modal.borrowApy}
           accountData={accountData}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); refetchPosition(); }}
+          onSuccess={() => {
+            setModal(null);
+            refetchPosition();
+          }}
         />
       )}
       {modal?.kind === "withdraw" && adapter && address && (
@@ -796,7 +904,10 @@ function AppInner() {
           suppliedBalance={modal.asset.balance}
           decimals={modal.asset.decimals}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); refetchPosition(); }}
+          onSuccess={() => {
+            setModal(null);
+            refetchPosition();
+          }}
         />
       )}
       {modal?.kind === "repay" && adapter && address && (
@@ -809,7 +920,10 @@ function AppInner() {
           debt={modal.asset.debt}
           decimals={modal.asset.decimals}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); refetchPosition(); }}
+          onSuccess={() => {
+            setModal(null);
+            refetchPosition();
+          }}
         />
       )}
     </>

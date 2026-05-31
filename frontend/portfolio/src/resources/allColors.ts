@@ -20,6 +20,7 @@ export const NETWORK_COLORS: Record<string, string> = {
   Scroll: "#ffe4ad",
   Linea: "#85daff",
   Plasma: "#84d18e",
+  "Base Sepolia": "#6b94ff",
 };
 
 export const ASSET_COLORS: Record<Asset, string> = {

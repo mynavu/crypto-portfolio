@@ -11,6 +11,7 @@ import {
   // useSwitchChain,
   useReadContract,
   useWriteContract,
+  usePublicClient,
 } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -113,7 +114,7 @@ const NETWORK_MAP: Record<number, keyof typeof TOKEN_ADDRESSES> = {
   42220: "celo",
   9745: "plasma",
   11155111: "sepolia",
-  84532: "base",
+  84532: "base_sepolia",
 };
 
 // ─── Data Builders ────────────────────────────────────────────────────────────
@@ -702,6 +703,7 @@ function AppInner() {
   const [amount, setAmount] = useState("");
   const { chainId } = useAppKitNetwork();
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const [aaveFlat, setAaveFlat] = useState<AaveApyFlat | null>(null);
   const [compoundAPY, setCompoundAPY] = useState<Record<string, number> | null>(
     null,
@@ -725,12 +727,13 @@ function AppInner() {
     poolAddress: Address,
     amount: bigint,
   ) {
-    await writeContractAsync({
+    const hash = await writeContractAsync({
       address: tokenAddress,
       abi: erc20Abi,
       functionName: "approve",
       args: [poolAddress, amount],
     });
+    await publicClient?.waitForTransactionReceipt({ hash });
   }
 
   async function borrow({

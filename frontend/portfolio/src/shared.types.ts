@@ -5,6 +5,7 @@ type EthNetwork =
   | "arbitrum"
   | "optimism"
   | "base"
+  | "base_sepolia"
   | "polygon"
   | "avalanche"
   | "linea"

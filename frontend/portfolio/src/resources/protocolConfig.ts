@@ -16,6 +16,7 @@ export const PROTOCOL_CONFIG: Record<EthProtocol, config> = {
       polygon: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
       avalanche: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
       base: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+      base_sepolia: "0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27",
       scroll: "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
       linea: "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
       celo: "0x3E59A31363E2ad014dcbc521c4a0d5757d9f3402",

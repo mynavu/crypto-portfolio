@@ -42,46 +42,50 @@ function createAaveStyleAdapter(
       const poolAddress = PROTOCOL_CONFIG[protocol].poolAddresses[networkKey];
       if (!poolAddress) throw new Error(`No pool for ${protocol} on ${networkKey}`);
       await approve(writeContractAsync, publicClient, tokenAddress, poolAddress, amount);
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: poolAddress,
         abi: aavePoolAbi,
         functionName: "supply",
         args: [tokenAddress, amount, userAddress, 0],
       });
+      await publicClient?.waitForTransactionReceipt({ hash });
     },
 
     async borrow({ tokenAddress, amount, userAddress, networkKey }: BorrowParams) {
       const poolAddress = PROTOCOL_CONFIG[protocol].poolAddresses[networkKey];
       if (!poolAddress) throw new Error(`No pool for ${protocol} on ${networkKey}`);
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: poolAddress,
         abi: aavePoolAbi,
         functionName: "borrow",
         args: [tokenAddress, amount, 2, 0, userAddress],
       });
+      await publicClient?.waitForTransactionReceipt({ hash });
     },
 
     async repay({ tokenAddress, amount, userAddress, networkKey }: RepayParams) {
       const poolAddress = PROTOCOL_CONFIG[protocol].poolAddresses[networkKey];
       if (!poolAddress) throw new Error(`No pool for ${protocol} on ${networkKey}`);
       await approve(writeContractAsync, publicClient, tokenAddress, poolAddress, amount);
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: poolAddress,
         abi: aavePoolAbi,
         functionName: "repay",
         args: [tokenAddress, amount, 2, userAddress],
       });
+      await publicClient?.waitForTransactionReceipt({ hash });
     },
 
     async withdraw({ tokenAddress, amount, userAddress, networkKey }: WithdrawParams) {
       const poolAddress = PROTOCOL_CONFIG[protocol].poolAddresses[networkKey];
       if (!poolAddress) throw new Error(`No pool for ${protocol} on ${networkKey}`);
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: poolAddress,
         abi: aavePoolAbi,
         functionName: "withdraw",
         args: [tokenAddress, amount, userAddress],
       });
+      await publicClient?.waitForTransactionReceipt({ hash });
     },
   };
 }

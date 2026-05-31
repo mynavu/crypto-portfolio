@@ -245,10 +245,10 @@ function buildSingleNetworkEntries(
   ];
 }
 
+// ETH excluded — WETH borrowing is disabled on the Base Sepolia testnet market
 const BASE_SEPOLIA_AAVE_LINKS: Partial<Record<Asset, string>> = {
   USDC: "https://app.aave.com/reserve-overview/?underlyingAsset=0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f&marketName=proto_base_sepolia_v3",
   USDT: "https://app.aave.com/reserve-overview/?underlyingAsset=0x0a215d8ba66387dca84b284d18c3b4ec3de6e54a&marketName=proto_base_sepolia_v3",
-  ETH: "https://app.aave.com/reserve-overview/?underlyingAsset=0x4200000000000000000000000000000000000006&marketName=proto_base_sepolia_v3",
 };
 
 function buildBaseSepolia(asset: Asset): RateEntry[] {

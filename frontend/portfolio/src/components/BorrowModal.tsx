@@ -14,6 +14,16 @@ const TOKEN_DECIMALS: Record<string, number> = {
   sol: 6,
 };
 
+// Rough USD prices for converting availableBorrowsUsd → token units
+const APPROX_PRICE_USD: Record<string, number> = {
+  usdc: 1,
+  usdt: 1,
+  eth: 3500,
+  weth: 3500,
+  btc: 100000,
+  wbtc: 100000,
+};
+
 type BorrowModalProps = {
   token: string;
   tokenAddress: Address;
@@ -51,6 +61,11 @@ export function BorrowModal({
 
   const decimals = TOKEN_DECIMALS[token] ?? 18;
   const hf = accountData?.healthFactor ?? null;
+  const priceUsd = APPROX_PRICE_USD[token.toLowerCase()];
+  const maxTokens =
+    accountData && priceUsd
+      ? (accountData.availableBorrowsUsd / priceUsd).toFixed(decimals <= 6 ? 4 : 6)
+      : null;
 
   async function handleBorrow() {
     if (!amount) return;
@@ -61,7 +76,9 @@ export function BorrowModal({
       await adapter.borrow({ tokenAddress, amount: parsed, userAddress, networkKey });
       onSuccess();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Transaction failed");
+      const msg = e instanceof Error ? e.message : "Transaction failed";
+      // Trim viem's verbose calldata from the error string
+      setError(msg.length > 200 ? msg.slice(0, 200) + "…" : msg);
     } finally {
       setLoading(false);
     }
@@ -75,7 +92,10 @@ export function BorrowModal({
             <div className="text-xs text-zinc-500 font-mono">
               Available to Borrow:{" "}
               <span className="text-zinc-300">
-                ${accountData.availableBorrowsUsd.toFixed(2)}
+                ${accountData.availableBorrowsUsd.toFixed(4)}
+                {maxTokens && (
+                  <span className="text-zinc-500"> ≈ {maxTokens} {token.toUpperCase()}</span>
+                )}
               </span>
             </div>
             <div className="text-xs text-zinc-500 font-mono">
@@ -96,13 +116,23 @@ export function BorrowModal({
           </div>
         )}
 
-        <input
-          type="text"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className="bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-zinc-100 font-mono outline-none focus:border-[#444]"
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-zinc-100 font-mono outline-none focus:border-[#444]"
+          />
+          {maxTokens && (
+            <button
+              onClick={() => setAmount(maxTokens)}
+              className="px-3 py-2 text-xs font-bold text-zinc-400 border border-[#333] rounded-lg hover:border-[#555] hover:text-zinc-200 transition-colors"
+            >
+              MAX
+            </button>
+          )}
+        </div>
 
         {error && (
           <p className="text-xs text-rose-400 font-mono">{error}</p>
